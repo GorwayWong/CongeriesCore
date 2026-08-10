@@ -190,6 +190,8 @@ Core shall be:
 - Recoverable with documented at-least-once semantics
 - Extensible without Core modification
 - Compatible through versioned public contracts
+- Free of mandatory third-party production dependencies in the v0.2 reference
+  package; development and verification tooling may remain external
 
 Detailed contracts are indexed in [docs/rfcs/README.md](docs/rfcs/README.md), and
 accepted cross-cutting decisions are indexed in

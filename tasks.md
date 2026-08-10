@@ -12,9 +12,47 @@ Every task requires unit tests for its public contract and integration tests for
 cross-module behavior. Failure-path tests are part of acceptance, not optional
 follow-up work.
 
+### 1.1 Status Semantics
+
+- `Not Started`: no public implementation contract has been delivered.
+- `In Progress`: a reusable foundation exists, but at least one acceptance
+  criterion or required integration path remains incomplete.
+- `Implemented in 0.2.0`: the task contract and failure paths have verified
+  implementation coverage for the v0.2 baseline.
+
+### 1.2 Current Delivery Snapshot
+
+| Area | Status | Delivered baseline |
+| --- | --- | --- |
+| Project and shared types | Implemented | Python 3.12 package, typed identifiers, JSON boundary, deadlines, cancellation, trace, and structured errors |
+| Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repository, Session lifecycle, and Workspace versioning |
+| Scope and Authorization | In Progress | Generic Scope model, default-deny policy contract, AuthorizedDispatcher, and audit integration; concrete capability paths remain |
+| Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
+| Execution Harness and Storage | In Progress | RunService lifecycle coordination and initial state repositories; approval, evaluation, checkpoint, Artifact storage, and provider-wide storage contracts remain |
+| Providers, Agent execution, Workflow, Plugins, Tools, and MCP | Not Started | Importable package boundaries only |
+
+### 1.3 Next Recommended Milestone
+
+The next milestone is **provider-enabled minimal Agent execution**. Deliver it in
+this dependency order:
+
+1. Complete Task 3.1 ContextProvider and ContextResolver contracts.
+2. Complete Task 3.3 ModelProvider and model-binding contracts.
+3. Implement Task 3.4 AgentSpec and the minimal Agent Runtime.
+4. Route every Context and Model call through AuthorizedDispatcher, advancing
+   Task 2.3 with non-bypass integration tests.
+5. Add one end-to-end root AgentRun test covering context loading, model call,
+   state transitions, cancellation, authorization, and Runtime Events.
+
+MemoryProvider can follow this milestone unless the first Agent use case
+requires persistent cross-Run knowledge. Workflow execution should start only
+after direct Agent execution has a stable contract.
+
 ## 2. Phase 1: Architecture Baseline and Core Types
 
 ### Task 1.1 Project Structure
+
+Status: Implemented in 0.2.0
 
 Create modules for runtime, workflow, harness, state, policy, provider, plugin,
 skill, tool, event, checkpoint, and adapter contracts.
@@ -26,6 +64,8 @@ Acceptance:
 - Public modules depend on interfaces rather than concrete infrastructure.
 
 ### Task 1.2 Shared Runtime Types
+
+Status: Implemented in 0.2.0
 
 Implement stable identifiers, RuntimeCallContext, structured provider errors,
 deadlines, cancellation, trace correlation, and idempotency keys.
@@ -45,6 +85,8 @@ Acceptance:
 ## 3. Phase 2: Run, Session, Scope, and Authorization
 
 ### Task 2.1 Run Model and State Machine
+
+Status: Implemented in 0.2.0
 
 Implement Run, AgentRun, WorkflowRun, parent/root relationships, attempts,
 timestamps, errors, and the RFC-0004 state machine.
@@ -69,6 +111,8 @@ Acceptance:
 
 ### Task 2.2 Session and Workspace
 
+Status: Implemented in 0.2.0
+
 Implement SessionRef with OPEN/CLOSED lifecycle and Workspace state ownership.
 
 Acceptance:
@@ -78,6 +122,23 @@ Acceptance:
 - Core Session state stores no messages, participants, or user model.
 
 ### Task 2.3 Scope and Authorization
+
+Status: In Progress
+
+Delivered:
+
+- Generic namespaced ScopeRef and runtime principal, action, and resource values
+- AuthorizationPolicy, deny-all default, PolicyDecision, and explicit Grant
+- AuthorizedDispatcher with unknown-action denial, Scope validation, deadline,
+  cancellation, and audit gates
+- Audit failure integration with PAUSED or policy-selected FAILED Run control
+
+Remaining:
+
+- Make real Context, Memory, Model, Tool, and MCP paths use the dispatcher
+- Add shared non-bypass contract tests for every protected capability family
+- Verify resource registration and provider failure behavior at integration
+  boundaries
 
 Implement ScopeRef, runtime principals, AccessRequest, PolicyDecision, and
 AuthorizationPolicy with default-deny behavior.
@@ -100,6 +161,8 @@ Acceptance:
 
 ### Task 3.1 Context Harness
 
+Status: Not Started
+
 Implement ContextProvider, provider selection, ContextResolver, injection, and
 complete or partial ContextResult handling.
 
@@ -112,6 +175,8 @@ Acceptance:
 - Hidden global context and implicit database access are absent.
 
 ### Task 3.2 MemoryProvider
+
+Status: Not Started
 
 Implement `retrieve`, `remember`, `forget`, and optional `consolidate` contracts
 with Scope, pagination, idempotency, and structured results.
@@ -126,6 +191,8 @@ Acceptance:
 - Core has no memory schema, embedding, ranking, or database implementation.
 
 ### Task 3.3 ModelProvider
+
+Status: Not Started
 
 Implement vendor-neutral `generate`, `stream`, and `capabilities` contracts and
 AgentSpec model bindings.
@@ -145,9 +212,44 @@ Acceptance:
 - AgentSpec contains provider and model references, not SDK clients.
 - At least two fake provider implementations pass the same contract tests.
 
+### Task 3.4 AgentSpec and Minimal Agent Runtime
+
+Status: Not Started
+
+Implement AgentSpec, validated composition and bindings, Agent construction, and
+direct Agent execution coordinated through AgentRun.
+
+Dependencies:
+
+- Task 2.3 generic authorization foundation
+- Task 3.1 ContextProvider and ContextResolver
+- Task 3.3 ModelProvider
+
+Failure scenarios:
+
+- Missing or incompatible Context or Model binding
+- Context resolution denied, partial, unavailable, timed out, or cancelled
+- Model invocation denied, unavailable, timed out, cancelled, or malformed
+- Stale Run transition while completing or cancelling execution
+
+Acceptance:
+
+- An Agent with no Skills or Tools can execute as a root AgentRun.
+- AgentSpec stores registered capability references, not implementation objects.
+- CONTEXT_LOADING and RUNNING transitions surround the corresponding protected
+  calls and emit Runtime Events after state commit.
+- Deadline, cancellation, Scope, trace, and idempotency propagate through every
+  external call.
+- The minimal runtime has no business concept, application workflow, or vendor
+  SDK dependency.
+- An end-to-end test executes a fake ContextProvider and fake ModelProvider
+  through authorization and reaches SUCCEEDED without a plugin.
+
 ## 5. Phase 4: Workflow, Checkpoint, and Harness
 
 ### Task 4.1 Workflow Runtime
+
+Status: Not Started
 
 Implement Workflow definition, input and output schemas, graph validation,
 ExecutionPolicy, WorkflowContext, WorkflowResult, and Agent, Skill, Tool,
@@ -161,6 +263,8 @@ Acceptance:
 - No predefined business workflow exists in Core.
 
 ### Task 4.2 CheckpointStore and Recovery
+
+Status: Not Started
 
 Implement atomic save, load, list, and delete; stable node boundaries; graph
 version validation; recovery attempts; and checkpoint migration hooks.
@@ -181,6 +285,23 @@ Acceptance:
 
 ### Task 4.3 Execution, Approval, and Evaluation Harnesses
 
+Status: In Progress
+
+Delivered:
+
+- Pure RunStateMachine and asynchronous RunService coordination
+- Start, advance, pause, resume, retry, redispatch, recovery, completion,
+  failure, and cancellation lifecycle operations
+- State-version compare-and-set and competing completion/cancellation coverage
+- Deadline and cancellation primitives propagated by RuntimeCallContext
+
+Remaining:
+
+- Active child-call cancellation coordination
+- Approval request and authorized decision handling
+- Schema, policy, and quality evaluation pipelines
+- Checkpoint coordination around recovery and approval boundaries
+
 Implement pause, resume, cancellation, retry, recovery, approval decisions,
 schema validation, policy checking, and quality evaluation.
 
@@ -194,6 +315,8 @@ Acceptance:
 ## 6. Phase 5: Plugin SDK, Skill, Tool, and MCP
 
 ### Task 5.1 Plugin SDK and Safe Unload
+
+Status: Not Started
 
 Implement manifest validation, dependency resolution, capability registration,
 active leases, drain, unregistration, unload, and lifecycle events.
@@ -214,6 +337,8 @@ Acceptance:
 
 ### Task 5.2 Skill and Tool Registries
 
+Status: Not Started
+
 Implement discovery, versioned registration, progressive Skill loading, typed
 Tool schemas, authorization, execution policy, and idempotency declaration.
 
@@ -224,6 +349,8 @@ Acceptance:
 - Tool calls cannot bypass Scope or RuntimeCallContext.
 
 ### Task 5.3 MCP Adapter
+
+Status: Not Started
 
 Implement capability discovery, schema mapping, Context and Tool integration,
 and policy enforcement.
@@ -238,6 +365,8 @@ Acceptance:
 
 ### Task 6.1 Runtime Events and Event Sinks
 
+Status: Implemented in 0.2.0
+
 Implement the versioned envelope, per-Run sequence, observability and audit
 classes, redaction, sink routing, acknowledgement, and deduplication.
 
@@ -250,6 +379,23 @@ Acceptance:
 
 ### Task 6.2 Storage Abstractions
 
+Status: In Progress
+
+Delivered:
+
+- Replaceable RunRepository with a thread-safe in-memory compare-and-set adapter
+- Replaceable SessionRepository with an in-memory lifecycle adapter
+- Versioned WorkspaceState updates
+- Replaceable EventSequenceStore and AuditOutbox with in-memory and SQLite
+  adapters
+
+Remaining:
+
+- Workspace, Artifact, and Checkpoint repository contracts
+- StorageProvider boundary and authorization for all state access
+- Common contract tests shared by in-memory and external adapters
+- Standard storage failure mapping and compatibility fixtures
+
 Implement replaceable Workspace, Artifact, Session, Run, and Checkpoint storage
 contracts and adapters without selecting a mandatory database.
 
@@ -260,6 +406,8 @@ Acceptance:
 - Storage failures map to standard structured errors.
 
 ### Task 6.3 Compatibility Suite
+
+Status: Not Started
 
 Add compatibility fixtures for public schemas, provider contracts, plugin
 manifests, event envelopes, and checkpoint formats.

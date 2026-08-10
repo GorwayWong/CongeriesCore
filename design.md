@@ -6,7 +6,7 @@ Version: 0.2.0
 
 This document describes the current v0.2 architecture and how its normative
 contracts compose. Detailed fields, state transitions, and failure semantics
-belong to the Accepted RFC linked by each section.
+belong to the Accepted or Implemented RFC linked by each section.
 
 The design complies with [principles.md](principles.md), satisfies
 [requirements.md](requirements.md), and applies the decisions indexed in
@@ -92,8 +92,8 @@ Run
 ├── identity: run_id, kind, definition_id
 ├── relationships: root_run_id, parent_run_id
 ├── boundaries: workspace_id, session_ref, scope
-├── control: status, attempt, policy
-└── record: timestamps, error_summary
+├── control: status, attempt, continuation_status, policy
+└── record: timestamps, error_summary, attempt_history
 ```
 
 Workflow AgentNode execution creates an AgentRun whose parent is the executing
@@ -101,6 +101,21 @@ WorkflowRun. Direct Agent execution creates a root AgentRun.
 
 The normative state machine is
 [RFC-0004](docs/rfcs/RFC-0004-execution-run-lifecycle.md).
+
+Run mutation separates pure lifecycle calculation from asynchronous
+coordination:
+
+```text
+Lifecycle Command
+    -> RunService
+    -> RunStateMachine (pure transition)
+    -> RunRepository compare-and-set
+    -> RunStateChanged publication after commit
+```
+
+RunRepository is replaceable. The in-memory reference implementation protects
+compare-and-set with a process-local thread lock so competing completion and
+cancellation commands cannot both commit.
 
 ### 4.2 SessionRef
 
@@ -129,6 +144,9 @@ RuntimeCallContext
 └── idempotency_key
 ```
 
+Derived child calls retain cancellation propagation and may only narrow Scope
+or shorten a parent deadline. They cannot silently broaden either boundary.
+
 Before dispatch, AuthorizationPolicy evaluates an AccessRequest containing the
 runtime principal, action, resource, and ScopeRef. Missing authorization is
 denied. The normative security contract is
@@ -146,6 +164,11 @@ A retryable attempt failure closes the attempt and moves the non-terminal Run
 to RETRYING without entering FAILED. Retry redispatch increments attempt and
 returns to the failed resumable phase. A non-retryable failure or exhausted
 retry policy moves the Run to irreversible FAILED.
+
+`continuation_status` is persisted only while a Run is PAUSED or RETRYING. A
+PAUSED Run records the resumable phase selected for `resume`; a RETRYING Run
+records the failed phase selected for retry redispatch. Resume and redispatch
+clear the field atomically while opening the current attempt if necessary.
 
 ### 6.2 Context Harness
 
@@ -216,6 +239,19 @@ two delivery classes:
 Audit sink failure pauses the Run by default; execution policy may fail it.
 Runtime Events do not own execution state and do not imply Event Sourcing.
 
+```text
+RuntimeEvent
+    -> schema validation
+    -> EventSink authorization
+    -> explicit sensitivity redaction
+    -> OBSERVABILITY: bounded asynchronous queue
+    -> AUDIT: durable outbox -> required acknowledgements
+```
+
+EventSequenceStore and AuditOutbox are replaceable ports. The reference SQLite
+adapter uses WAL, transactions, a busy timeout, and thread offloading. Runtime
+state remains in Run, Session, and Workspace stores rather than the outbox.
+
 See [RFC-0010](docs/rfcs/RFC-0010-runtime-events.md).
 
 ## 10. Plugin System
@@ -274,5 +310,5 @@ state, audit, and checkpoint behavior.
 ## 13. Delivery Roadmap
 
 Implementation phases and acceptance criteria are defined in
-[tasks.md](tasks.md). This design introduces no implementation framework or
-vendor dependency.
+[tasks.md](tasks.md), which is the single progress tracker. This design
+introduces no implementation framework or vendor dependency.

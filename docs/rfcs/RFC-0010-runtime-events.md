@@ -2,7 +2,7 @@
 
 - ID: RFC-0010
 - Title: Runtime Events
-- Status: Accepted
+- Status: Implemented
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
@@ -134,4 +134,3 @@ A conforming implementation demonstrates:
 - At-least-once audit retry with sink deduplication.
 - Redaction before dispatch.
 - Runtime state access without event replay.
-

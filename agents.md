@@ -19,7 +19,7 @@ and link to them instead of copying them here.
 | [requirements.md](requirements.md) | Product scope, required behavior, and quality attributes | Changing observable Core behavior |
 | [docs/adrs/README.md](docs/adrs/README.md) | Accepted cross-cutting architectural decisions | Understanding why a durable decision was made |
 | [design.md](design.md) | Current system architecture and composition of public contracts | Changing responsibilities, data flow, or module relationships |
-| [docs/rfcs/README.md](docs/rfcs/README.md) | Detailed public contracts; an Accepted RFC is normative within its scope | Changing an interface, lifecycle, schema, or execution semantic |
+| [docs/rfcs/README.md](docs/rfcs/README.md) | Detailed public contracts; Accepted and Implemented RFCs are normative within their scope | Changing an interface, lifecycle, schema, or execution semantic |
 | [tasks.md](tasks.md) | Delivery phases and testable acceptance criteria | Planning or completing implementation work |
 | [docs/overview.md](docs/overview.md) | Non-normative orientation and navigation | Learning the system for the first time |
 | [docs/README.md](docs/README.md) | Document registry and governance | Adding, moving, or superseding documents |
@@ -31,7 +31,7 @@ Use the map by ownership:
 2. Confirm required behavior in `requirements.md`.
 3. Check accepted ADRs for cross-cutting decisions.
 4. Use `design.md` for the current architecture.
-5. Read the owning Accepted RFC for detailed contract semantics.
+5. Read the owning Accepted or Implemented RFC for detailed contract semantics.
 6. Use `tasks.md` for delivery order and acceptance criteria.
 
 ## 3. Authority and Conflict Resolution
@@ -42,8 +42,8 @@ Documents have authority by subject, not simply by publication date.
 - Requirements must comply with principles and own product behavior.
 - Accepted ADRs own cross-cutting decisions but cannot weaken requirements.
 - Design must reflect principles, requirements, and accepted ADRs.
-- An Accepted RFC owns the detailed contract in its declared scope and must be
-  synchronized with design.
+- An Accepted or Implemented RFC owns the detailed contract in its declared
+  scope and must be synchronized with design.
 - Tasks cannot introduce new requirements or architecture.
 - Overview and migration pages are non-normative.
 - This guide governs contribution workflow only.

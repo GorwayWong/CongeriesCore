@@ -161,7 +161,7 @@ may be provided, but the public contract must remain independent.
 Public Core APIs, provider contracts, plugin manifests, event schemas, and
 checkpoint formats evolve deliberately.
 
-After the v0.2 pre-implementation baseline, breaking changes require:
+Beginning with the v0.2 public implementation baseline, breaking changes require:
 
 - A documented rationale
 - Compatibility impact analysis

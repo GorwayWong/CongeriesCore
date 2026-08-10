@@ -2,7 +2,7 @@
 
 - ID: RFC-0004
 - Title: Execution Run Lifecycle
-- Status: Accepted
+- Status: Implemented
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
@@ -38,6 +38,8 @@ Run contains:
 | `updated_at` | Last state change timestamp |
 | `ended_at` | Terminal timestamp, if terminal |
 | `error_summary` | Structured terminal or latest attempt error, if present |
+| `continuation_status` | Persisted resumable phase while PAUSED or failed phase while RETRYING |
+| `attempt_history` | Ordered records for started, completed, interrupted, or failed attempts |
 
 AgentRun adds `agent_id` and model binding reference. WorkflowRun adds
 `workflow_id`, graph version, and latest checkpoint reference.
@@ -93,6 +95,10 @@ Any active state -> CANCELLED
 RUNNING -> SUCCEEDED
 Any active state -> FAILED for a final or non-retryable failure
 ```
+
+`continuation_status` is present only in PAUSED and RETRYING. In PAUSED it
+identifies the phase selected by `resume`; in RETRYING it identifies the failed
+phase selected by retry redispatch. Other states reject a non-null value.
 
 Additional legal transitions:
 
@@ -150,6 +156,11 @@ may still run, but it cannot rewrite the committed terminal state.
 Repeated operations are idempotent when they request an already reached state,
 and return a conflict when their requested transition is no longer legal.
 
+Resume and retry redispatch atomically clear `continuation_status`. If the
+target attempt has no open AttemptRecord, the same mutation opens it. This
+preserves attempt history when RETRYING or RECOVERING is paused before
+redispatch.
+
 ## 9. Events and Audit
 
 Every committed transition emits RunStateChanged with previous status, new
@@ -173,3 +184,4 @@ A conforming implementation demonstrates:
 - Rejection of illegal transitions, retry after FAILED, and recovery after
   FAILED.
 - CLOSED Session association rejection without history deletion.
+- Persisted continuation through PAUSED and RETRYING serialization.

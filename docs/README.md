@@ -15,14 +15,14 @@ CongeriesCore. Start with the [system overview](overview.md) for orientation.
 | [Requirements](../requirements.md) | Product scope, required behavior, and quality attributes |
 | [ADRs](adrs/README.md) | Accepted cross-cutting and durable decisions |
 | [Design](../design.md) | Current system architecture and contract composition |
-| [Accepted RFCs](rfcs/README.md) | Detailed public contracts within their declared scope |
+| [Accepted and Implemented RFCs](rfcs/README.md) | Detailed public contracts within their declared scope |
 | [Tasks](../tasks.md) | Implementation order and acceptance criteria |
 | [Overview](overview.md) | Non-normative orientation and links |
 | [Agent Guide](../agents.md) | Contribution workflow |
 
 No document may weaken a higher-level principle or requirement. Design and an
-Accepted RFC are synchronized views: design owns system composition, while the
-RFC owns detailed semantics in its scope.
+Accepted or Implemented RFC are synchronized views: design owns system
+composition, while the RFC owns detailed semantics in its scope.
 
 ## RFC Lifecycle
 
@@ -35,8 +35,9 @@ Accepted or Implemented -> Deprecated -> Superseded
 ```
 
 - Draft and In Review RFCs are proposals and are not normative.
-- Accepted RFCs are normative within their declared scope.
-- Implemented means the contract has verified implementation coverage.
+- Accepted and Implemented RFCs are normative within their declared scope.
+- Implemented additionally means the contract has verified implementation
+  coverage.
 - Rejected RFCs remain available as historical proposals.
 - Deprecated RFCs remain supported during a documented migration window.
 - Superseded RFCs link to their replacement.
@@ -78,8 +79,8 @@ version where its RFC requires one.
 
 ## Change Synchronization
 
-An Accepted RFC or ADR change updates every affected higher-level or downstream
-document in the same change:
+An Accepted or Implemented RFC, or an Accepted ADR, updates every affected
+higher-level or downstream document in the same change:
 
 1. Confirm compliance with principles.
 2. Update requirements when observable behavior changes.
@@ -105,4 +106,3 @@ with relative links to the owning document.
 - [Original RFC-0004 path](RFC-0004-Agent-Runtime-Lifecycle.md)
 - [Original RFC-0005 path](RFC-0005-Architecture-Decision-Records.md)
 - [Original RFC-0006 path](RFC-0006-Context-and-Memory-Provider-Specification.md)
-
