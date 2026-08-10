@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from threading import Event
+from threading import Event, Lock
 from typing import Protocol
 
 from .errors import ErrorCategory, core_error
@@ -49,7 +52,7 @@ class Deadline:
 class CancellationToken:
     """Thread-safe cancellation signal that can cross async adapter boundaries."""
 
-    __slots__ = ("_event", "token_id")
+    __slots__ = ("_callbacks", "_event", "_lock", "token_id")
 
     def __init__(
         self,
@@ -59,6 +62,8 @@ class CancellationToken:
     ) -> None:
         self.token_id = token_id or CancellationId.new()
         self._event = Event()
+        self._lock = Lock()
+        self._callbacks: set[Callable[[], None]] = set()
         if cancelled:
             self._event.set()
 
@@ -67,9 +72,15 @@ class CancellationToken:
         return self._event.is_set()
 
     def cancel(self) -> bool:
-        was_cancelled = self.cancelled
-        self._event.set()
-        return not was_cancelled
+        with self._lock:
+            if self._event.is_set():
+                return False
+            self._event.set()
+            callbacks = tuple(self._callbacks)
+            self._callbacks.clear()
+        for callback in callbacks:
+            callback()
+        return True
 
     def raise_if_cancelled(self) -> None:
         if self.cancelled:
@@ -78,6 +89,33 @@ class CancellationToken:
                 "call_cancelled",
                 "runtime call was cancelled",
             )
+
+    async def wait_cancelled(self) -> None:
+        """Wait without polling and wake safely when another thread cancels."""
+
+        if self.cancelled:
+            return
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        def wake() -> None:
+            with suppress(RuntimeError):
+                loop.call_soon_threadsafe(_resolve_future, future)
+
+        with self._lock:
+            if self._event.is_set():
+                return
+            self._callbacks.add(wake)
+        try:
+            await future
+        finally:
+            with self._lock:
+                self._callbacks.discard(wake)
+
+
+def _resolve_future(future: asyncio.Future[None]) -> None:
+    if not future.done():
+        future.set_result(None)
 
 
 @dataclass(frozen=True, slots=True)

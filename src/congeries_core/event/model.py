@@ -49,6 +49,13 @@ class Sensitivity(IntEnum):
 
 class CoreEventType(StrEnum):
     RUN_STATE_CHANGED = "core.run.state_changed"
+    CONTEXT_RESOLUTION_STARTED = "core.context.resolution_started"
+    CONTEXT_PROVIDER_SELECTED = "core.context.provider_selected"
+    CONTEXT_RESOLUTION_COMPLETED = "core.context.resolution_completed"
+    CONTEXT_RESOLUTION_FAILED = "core.context.resolution_failed"
+    MODEL_INVOCATION_STARTED = "core.model.invocation_started"
+    MODEL_INVOCATION_COMPLETED = "core.model.invocation_completed"
+    MODEL_INVOCATION_FAILED = "core.model.invocation_failed"
     TOOL_INVOCATION_STARTED = "core.tool.invocation_started"
     TOOL_INVOCATION_COMPLETED = "core.tool.invocation_completed"
     TOOL_INVOCATION_FAILED = "core.tool.invocation_failed"

@@ -61,6 +61,24 @@ Agent = Identity
 AgentSpec references registered capabilities and a vendor-neutral ModelProvider
 binding. It does not contain provider implementation objects.
 
+AgentRegistry resolves an exact Agent and definition identity. The minimal
+direct Agent Runtime validates Run, AgentSpec, binding, Scope, Workspace, and
+Session identity before execution, then coordinates:
+
+```text
+CREATED -> STARTING -> CONTEXT_LOADING
+    -> authorized ContextResolver
+    -> RUNNING
+    -> authorized ModelProvider.generate
+    -> SUCCEEDED
+```
+
+Expected Provider and policy failures return `AgentExecutionResult` with the
+committed AgentRun and structured error. Cancellation maps to CANCELLED; denied,
+timeout, unavailable, malformed, and unacceptable partial results map to FAILED.
+A reliable audit failure preserves the PAUSED or policy-selected FAILED state
+already committed by RunService.
+
 ### 3.2 Workflow
 
 Workflow is an executable graph:
@@ -146,6 +164,9 @@ RuntimeCallContext
 
 Derived child calls retain cancellation propagation and may only narrow Scope
 or shorten a parent deadline. They cannot silently broaden either boundary.
+CancellationToken provides an asynchronous wait boundary so Provider tasks can
+be actively cancelled while Core is awaiting them. Core checks cancellation and
+deadline both before and after each Provider await; late results are discarded.
 
 Before dispatch, AuthorizationPolicy evaluates an AccessRequest containing the
 runtime principal, action, resource, and ScopeRef. Missing authorization is
@@ -179,6 +200,13 @@ Run -> ContextResolver -> Selected ContextProviders -> ContextResult -> Runtime
 The resolver applies authorization before provider invocation and has explicit
 complete, partial, denied, timeout, cancelled, and failed outcomes.
 
+ContextBinding contains only ordered Provider references, typed requirements,
+budget, merge strategy, and completeness policy. ContextProviderRegistry owns
+implementations. ContextResolver performs authorized capability discovery and
+supports deterministic `single`, `first_success`, `merge`, and `all` behavior.
+SchemaRegistry validates entries, and ContextMergeRegistry requires an explicit
+schema merge policy for conflicting values.
+
 See [RFC-0006](docs/rfcs/RFC-0006-context-provider.md).
 
 ### 6.3 Memory Harness
@@ -209,6 +237,13 @@ ModelProvider supports vendor-neutral generation, streaming, capability
 discovery, usage, deadline, cancellation, structured output, and structured
 errors. See [RFC-0009](docs/rfcs/RFC-0009-model-provider.md).
 
+ModelProviderRegistry owns implementations while ModelBinding stores a binding
+reference, primary Provider/model selector, capability requirements, defaults,
+and ordered fallback selectors. ModelGateway is the only generation and stream
+path. It applies authorization constraints, validates structured output through
+SchemaRegistry, normalizes stream termination, and closes cancellable streams.
+Fallback occurs only for unavailable or unsupported capability outcomes.
+
 Storage remains an abstraction:
 
 ```text
@@ -238,6 +273,11 @@ two delivery classes:
 
 Audit sink failure pauses the Run by default; execution policy may fail it.
 Runtime Events do not own execution state and do not imply Event Sourcing.
+
+Context resolution and Model invocation emit redacted OBSERVABILITY events with
+references, counts, usage, latency, outcome, and safe error codes. They never
+include Context values, prompts, or generated output. Their delivery failure does
+not alter Run state.
 
 ```text
 RuntimeEvent

@@ -70,20 +70,55 @@ use idempotency keys.
 
 ## Typical Execution Flow
 
+The implemented v0.2 direct Agent path is:
+
 ```text
-Create root Run
-    -> authorize and load Context
-    -> execute Agent or Workflow
-    -> invoke scoped capabilities
-    -> checkpoint stable boundaries
-    -> pause for approval when requested
-    -> evaluate output
-    -> record terminal state
+Create root AgentRun
+    -> STARTING
+    -> CONTEXT_LOADING
+    -> authorize Context capability discovery and resolution
+    -> RUNNING
+    -> authorize Model capability discovery and generation
+    -> SUCCEEDED, FAILED, or CANCELLED
 ```
 
-Every transition emits runtime events. Observability events do not block normal
-execution. Security, authorization, and approval audit events use reliable
-delivery according to execution policy.
+ContextProvider and ModelProvider implementations are resolved from injected
+registries. AgentSpec, ContextBinding, and ModelBinding contain references, not
+live Provider or vendor SDK objects. Context and Model calls cannot bypass
+AuthorizedDispatcher.
+
+Run transitions are committed with compare-and-set before their state-change
+events are published. Context resolution and Model invocation also emit redacted
+observability events. Observability failure does not change Run outcome;
+reliable authorization audit failure pauses the Run by default or fails it when
+the Run control policy requires failure.
+
+## Current v0.2 Implementation Boundary
+
+The verified direct Agent slice includes:
+
+- Provider-neutral text, JSON, and reference content blocks
+- Shared registered schemas for Context and structured Model output
+- Deterministic Context selection with single, first-success, merge, and all
+  strategies
+- Model generation, streaming, capabilities, usage, structured output, and
+  restricted fallback
+- Active deadline and cancellation propagation to Provider calls
+- Exactly one terminal Model stream event and cleanup of closable streams
+- Root AgentRun execution without a Plugin, Skill, Tool, MemoryProvider, or
+  Workflow
+
+The following remain outside this implemented slice:
+
+- Persistent MemoryProvider behavior
+- Model-driven Tool execution loops
+- Workflow graph execution and checkpoint recovery
+- Approval and evaluation coordination
+- Plugin lifecycle and MCP capability adapters
+
+These future capability families must reuse the implemented authorization,
+RuntimeCallContext, cancellation, error, and event boundaries before their own
+delivery tasks can be marked Implemented.
 
 ## Extension Flow
 
@@ -111,4 +146,3 @@ and infrastructure remain replaceable through adapters and providers.
 
 Cross-cutting rationale is indexed in the [ADR Registry](adrs/README.md), and
 implementation sequencing is defined in [tasks.md](../tasks.md).
-

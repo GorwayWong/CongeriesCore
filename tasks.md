@@ -26,27 +26,28 @@ follow-up work.
 | --- | --- | --- |
 | Project and shared types | Implemented | Python 3.12 package, typed identifiers, JSON boundary, deadlines, cancellation, trace, and structured errors |
 | Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repository, Session lifecycle, and Workspace versioning |
-| Scope and Authorization | In Progress | Generic Scope model, default-deny policy contract, AuthorizedDispatcher, and audit integration; concrete capability paths remain |
+| Scope and Authorization | Implemented | Generic Scope model, default-deny AuthorizedDispatcher, audit integration, and non-bypass Context, Model, and EventSink paths |
 | Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
-| Execution Harness and Storage | In Progress | RunService lifecycle coordination and initial state repositories; approval, evaluation, checkpoint, Artifact storage, and provider-wide storage contracts remain |
-| Providers, Agent execution, Workflow, Plugins, Tools, and MCP | Not Started | Importable package boundaries only |
+| Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, and initial state repositories; approval, evaluation, checkpoint, Artifact storage, and provider-wide storage contracts remain |
+| Context, Model, and direct Agent execution | Implemented | Authorized Context resolution, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
+| Memory, Workflow, Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
 
 ### 1.3 Next Recommended Milestone
 
-The next milestone is **provider-enabled minimal Agent execution**. Deliver it in
-this dependency order:
+The next milestone is **MemoryProvider and remaining capability-boundary
+coverage**. Deliver it in this dependency order:
 
-1. Complete Task 3.1 ContextProvider and ContextResolver contracts.
-2. Complete Task 3.3 ModelProvider and model-binding contracts.
-3. Implement Task 3.4 AgentSpec and the minimal Agent Runtime.
-4. Route every Context and Model call through AuthorizedDispatcher, advancing
-   Task 2.3 with non-bypass integration tests.
-5. Add one end-to-end root AgentRun test covering context loading, model call,
-   state transitions, cancellation, authorization, and Runtime Events.
+1. Implement Task 3.2 MemoryProvider with retrieve, remember, forget, and
+   optional consolidate capability reporting.
+2. Route every Memory operation through AuthorizedDispatcher and add the same
+   non-bypass, deadline, cancellation, audit, and redaction contract tests.
+3. Advance Task 6.3 with compatibility fixtures for the implemented Context,
+   Model, AgentSpec, and event schemas.
+4. Begin Workflow execution only after checkpoint and approval boundaries are
+   ready to preserve the existing Run reliability contract.
 
-MemoryProvider can follow this milestone unless the first Agent use case
-requires persistent cross-Run knowledge. Workflow execution should start only
-after direct Agent execution has a stable contract.
+Tool and MCP tasks must register their actions and reuse the implemented
+AuthorizedDispatcher boundary before they may be marked Implemented.
 
 ## 2. Phase 1: Architecture Baseline and Core Types
 
@@ -123,7 +124,7 @@ Acceptance:
 
 ### Task 2.3 Scope and Authorization
 
-Status: In Progress
+Status: Implemented in 0.2.0
 
 Delivered:
 
@@ -132,13 +133,15 @@ Delivered:
 - AuthorizedDispatcher with unknown-action denial, Scope validation, deadline,
   cancellation, and audit gates
 - Audit failure integration with PAUSED or policy-selected FAILED Run control
+- Authorized Context capability and provide paths with key and budget narrowing
+- Authorized Model capability, generate, and stream paths with model, Tool, and
+  budget narrowing
+- Existing EventSink paths share the boundary
+- Non-bypass, unknown-action, cancellation, deadline, invalid-grant, and
+  audit-failure integration coverage
 
-Remaining:
-
-- Make real Context, Memory, Model, Tool, and MCP paths use the dispatcher
-- Add shared non-bypass contract tests for every protected capability family
-- Verify resource registration and provider failure behavior at integration
-  boundaries
+Future Memory, Tool, Checkpoint, Storage, and MCP tasks must register actions
+and reuse this boundary before their individual task status becomes Implemented.
 
 Implement ScopeRef, runtime principals, AccessRequest, PolicyDecision, and
 AuthorizationPolicy with default-deny behavior.
@@ -161,7 +164,7 @@ Acceptance:
 
 ### Task 3.1 Context Harness
 
-Status: Not Started
+Status: Implemented in 0.2.0
 
 Implement ContextProvider, provider selection, ContextResolver, injection, and
 complete or partial ContextResult handling.
@@ -192,7 +195,7 @@ Acceptance:
 
 ### Task 3.3 ModelProvider
 
-Status: Not Started
+Status: Implemented in 0.2.0
 
 Implement vendor-neutral `generate`, `stream`, and `capabilities` contracts and
 AgentSpec model bindings.
@@ -214,7 +217,7 @@ Acceptance:
 
 ### Task 3.4 AgentSpec and Minimal Agent Runtime
 
-Status: Not Started
+Status: Implemented in 0.2.0
 
 Implement AgentSpec, validated composition and bindings, Agent construction, and
 direct Agent execution coordinated through AgentRun.
@@ -294,10 +297,11 @@ Delivered:
   failure, and cancellation lifecycle operations
 - State-version compare-and-set and competing completion/cancellation coverage
 - Deadline and cancellation primitives propagated by RuntimeCallContext
+- Active Context and Model Provider calls are cancelled while Core awaits them;
+  late results and post-terminal stream events are discarded
 
 Remaining:
 
-- Active child-call cancellation coordination
 - Approval request and authorized decision handling
 - Schema, policy, and quality evaluation pipelines
 - Checkpoint coordination around recovery and approval boundaries

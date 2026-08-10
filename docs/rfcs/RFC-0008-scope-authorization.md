@@ -2,7 +2,7 @@
 
 - ID: RFC-0008
 - Title: Scope and Authorization
-- Status: Accepted
+- Status: Implemented
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
@@ -103,6 +103,18 @@ validate request
 
 A provider may impose additional restrictions. It cannot broaden a Core grant.
 
+The v0.2 protected Provider actions are:
+
+- `core.context.capabilities`, `core.context.provide`
+- `core.model.capabilities`, `core.model.generate`, `core.model.stream`
+
+All actions use version `1`. Context AccessRequests identify Provider resources
+and carry key and budget constraints. Model AccessRequests identify the
+Provider/model pair and carry model, Tool exposure, and budget constraints. A
+grant may narrow Scope, keys, Tools, and budgets. It cannot change a requested
+model, add a key or Tool, increase a budget, or introduce an unknown constraint.
+Such expansion is an invalid grant and is denied before Provider invocation.
+
 ## 7. Cross-Scope Access
 
 Cross-scope access requires an explicit grant that names source and destination
@@ -147,3 +159,15 @@ A conforming implementation demonstrates:
 - Scope narrowing in child calls.
 - No built-in business scope or identity model.
 
+## 11. Implemented Capability Coverage
+
+The Implemented status covers the common AuthorizedDispatcher boundary and all
+v0.2 capability paths that currently exist: ContextProvider capability and
+provide calls, ModelProvider capability, generate, and stream calls, and
+EventSink dispatch. Their non-bypass, default-deny, unknown-action, constraint,
+cross-scope audit, deadline, cancellation, and audit-failure behavior is covered
+by contract or integration tests.
+
+Memory, Tool, Checkpoint, Storage, and MCP contracts are not implemented by this
+status. Each future capability must register versioned actions and reuse this
+boundary before its own delivery task may be marked Implemented.

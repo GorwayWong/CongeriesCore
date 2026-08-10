@@ -82,6 +82,10 @@ class ActionRef:
             "version": self.version,
         }
 
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ActionRef:
+        return cls(str(data["namespace"]), str(data["name"]), str(data["version"]))
+
 
 @dataclass(frozen=True, slots=True)
 class ResourceRef:
@@ -107,6 +111,18 @@ class ResourceRef:
             "id": self.id.value,
             "owning_extension": self.owning_extension,
         }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ResourceRef:
+        owning_extension = data.get("owning_extension")
+        return cls(
+            namespace=str(data["namespace"]),
+            kind=str(data["kind"]),
+            id=ResourceId(str(data["id"])),
+            owning_extension=(
+                str(owning_extension) if owning_extension is not None else None
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)

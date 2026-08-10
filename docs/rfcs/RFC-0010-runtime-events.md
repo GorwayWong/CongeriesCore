@@ -84,6 +84,13 @@ Core event types include:
 - `core.approval.decided`
 - `core.authorization.denied`
 - `core.authorization.cross_scope_granted`
+- `core.context.resolution_started`
+- `core.context.provider_selected`
+- `core.context.resolution_completed`
+- `core.context.resolution_failed`
+- `core.model.invocation_started`
+- `core.model.invocation_completed`
+- `core.model.invocation_failed`
 - `core.checkpoint.saved`
 - `core.checkpoint.failed`
 - `core.artifact.created`

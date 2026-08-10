@@ -9,6 +9,7 @@ from congeries_core.event.dispatcher import (
     EventDispatcher,
     SinkRegistration,
 )
+from congeries_core.event.integration import RuntimeEventPublisher
 from congeries_core.event.memory import InMemoryEventLedger, InMemoryEventSink
 from congeries_core.event.model import (
     ClassifiedPayload,
@@ -186,6 +187,44 @@ async def test_observability_is_non_blocking_and_diagnostic() -> None:
     await event_dispatcher.flush()
     assert [item.event_id for item in good.events] == [event.event_id]
     assert event_dispatcher.diagnostics[0].code == "sink_unavailable"
+    await event_dispatcher.close()
+
+
+@pytest.mark.asyncio
+async def test_provider_observability_event_uses_registered_redacted_schema() -> None:
+    sink = InMemoryEventSink(
+        "provider-events",
+        capabilities(DeliveryClass.OBSERVABILITY, acknowledgement=False),
+    )
+    event_dispatcher, _ = dispatcher(
+        SinkRegistration(sink), policy=MatchingAllowPolicy()
+    )
+    context = call_context()
+    await RuntimeEventPublisher(event_dispatcher).provider_event(
+        CoreEventType.MODEL_INVOCATION_COMPLETED.value,
+        context,
+        {
+            "operation": "generate",
+            "provider_id": "provider-1",
+            "model_id": "model-1",
+            "finish_reason": "stop",
+            "input_units": 3,
+            "output_units": 2,
+            "latency_ms": 4,
+            "outcome": "completed",
+        },
+    )
+    await event_dispatcher.flush()
+    assert sink.events[0].payload.visible_data() == {
+        "operation": "generate",
+        "provider_id": "provider-1",
+        "model_id": "model-1",
+        "finish_reason": "stop",
+        "input_units": 3,
+        "output_units": 2,
+        "latency_ms": 4,
+        "outcome": "completed",
+    }
     await event_dispatcher.close()
 
 

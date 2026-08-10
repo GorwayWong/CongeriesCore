@@ -13,10 +13,10 @@ semantics and metadata requirements are defined in the
 | [RFC-0003](RFC-0003-workflow.md) | Workflow | Accepted |
 | [RFC-0004](RFC-0004-execution-run-lifecycle.md) | Execution Run Lifecycle | Implemented |
 | [RFC-0005](RFC-0005-architecture-decision-records.md) | Legacy ADR Bundle | Withdrawn/Misclassified |
-| [RFC-0006](RFC-0006-context-provider.md) | ContextProvider | Accepted |
+| [RFC-0006](RFC-0006-context-provider.md) | ContextProvider | Implemented |
 | [RFC-0007](RFC-0007-memory-provider.md) | MemoryProvider | Accepted |
-| [RFC-0008](RFC-0008-scope-authorization.md) | Scope and Authorization | Accepted |
-| [RFC-0009](RFC-0009-model-provider.md) | ModelProvider | Accepted |
+| [RFC-0008](RFC-0008-scope-authorization.md) | Scope and Authorization | Implemented |
+| [RFC-0009](RFC-0009-model-provider.md) | ModelProvider | Implemented |
 | [RFC-0010](RFC-0010-runtime-events.md) | Runtime Events | Implemented |
 | [RFC-0011](RFC-0011-checkpoint-recovery.md) | Checkpoint and Recovery | Accepted |
 

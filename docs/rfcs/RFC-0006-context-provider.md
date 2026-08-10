@@ -2,7 +2,7 @@
 
 - ID: RFC-0006
 - Title: ContextProvider
-- Status: Accepted
+- Status: Implemented
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
@@ -46,9 +46,22 @@ ContextResult contains:
 - Missing keys and structured warnings
 - Provenance references
 - Expiration or freshness metadata where applicable
+- Provider-neutral usage and budget accounting
 
 PARTIAL is a distinct successful transport outcome. ExecutionPolicy decides
 whether it is sufficient for the requesting node.
+
+Context entries and structured model output share registered `SchemaRef` values
+and an injected `SchemaRegistry`. Core provides no application schema engine.
+`ContentBlock` provides the shared provider-neutral `text`, `json`, and
+`reference` content representation.
+
+### ContextBinding
+
+ContextBinding stores ordered Provider references, required key and schema
+pairs, budget, merge strategy, and completeness policy. It never stores Provider
+implementation objects. ContextProviderRegistry owns implementations;
+ContextResolver owns selection and invocation.
 
 ## 3. Provider Contract
 
@@ -82,6 +95,9 @@ Provider selection is deterministic for the same registry, request, and policy.
 Priority, composition, fallback, and merge strategy are declared rather than
 discovered from hidden global state.
 
+The reference Agent Runtime rejects PARTIAL by default. A binding must declare
+`ALLOW_PARTIAL` before execution may continue with an incomplete result.
+
 ## 5. Merge Rules
 
 The resolver supports declared strategies:
@@ -98,6 +114,11 @@ does not silently select the last writer.
 
 Authorization occurs before provider invocation and may restrict keys, Scope,
 budget, or provider choice. A provider receives only the authorized request.
+
+Core registers `core.context.capabilities` and `core.context.provide`, version
+`1`. AccessRequest identifies the Provider resource and carries requested key
+names and budgets. A grant may retain or reduce the key set and budget; unknown,
+malformed, empty, or expanding constraints are invalid grants.
 
 Provider-internal checks may further restrict access but cannot expand the grant.
 Denial emits an audit event and returns the standard denied error.
@@ -120,9 +141,11 @@ results are discarded and cannot mutate injected context.
 
 ## 8. Observability and Redaction
 
-Resolution emits provider selection, latency, completeness, and outcome events.
-Payload values are excluded by default; events carry key names, provenance
-references, sizes, and redacted diagnostics.
+Resolution emits `core.context.resolution_started`,
+`core.context.provider_selected`, `core.context.resolution_completed`, and
+`core.context.resolution_failed` as OBSERVABILITY events. Payload values are
+excluded. Events carry Provider references, key and entry counts, usage,
+latency, completeness, outcome, and redacted error codes.
 
 ## 9. Conformance
 

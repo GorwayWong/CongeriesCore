@@ -10,3 +10,8 @@ The combined draft was split into stable contracts:
 - [RFC-0008 Scope and Authorization](rfcs/RFC-0008-scope-authorization.md)
 
 This legacy path contains no normative contract text.
+
+RFC-0006 and RFC-0008 are Implemented for the v0.2 Context and authorization
+baseline. RFC-0007 remains Accepted until the MemoryProvider contract has
+verified implementation coverage. See the [RFC Registry](rfcs/README.md) for
+current status.

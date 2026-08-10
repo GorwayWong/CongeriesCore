@@ -1,6 +1,7 @@
 """Shared runtime identities, context, errors, and execution models."""
 
 from .codec import dumps, loads
+from .content import ContentBlock, ContentKind
 from .context import RuntimeCallContext, SessionRef
 from .control import CancellationToken, Deadline, SystemClock, TraceContext
 from .errors import CoreError, ErrorCategory, ErrorDetail
@@ -8,6 +9,9 @@ from .ids import (
     AgentId,
     DefinitionId,
     IdempotencyKey,
+    ModelBindingRef,
+    ModelId,
+    ProviderId,
     RunId,
     SessionId,
     WorkflowId,
@@ -27,6 +31,7 @@ from .run import (
     create_root_agent_run,
     create_root_workflow_run,
 )
+from .schema import SchemaRef, SchemaRegistry, SchemaValidator
 from .scope import CoreScopeKind, ScopeRef
 
 __all__ = [
@@ -35,6 +40,8 @@ __all__ = [
     "AttemptOutcome",
     "AuditFailureMode",
     "CancellationToken",
+    "ContentBlock",
+    "ContentKind",
     "CoreError",
     "CoreScopeKind",
     "Deadline",
@@ -42,6 +49,9 @@ __all__ = [
     "ErrorCategory",
     "ErrorDetail",
     "IdempotencyKey",
+    "ModelBindingRef",
+    "ModelId",
+    "ProviderId",
     "Run",
     "RunControlPolicy",
     "RunId",
@@ -49,6 +59,9 @@ __all__ = [
     "RunStateMachine",
     "RunStatus",
     "RuntimeCallContext",
+    "SchemaRef",
+    "SchemaRegistry",
+    "SchemaValidator",
     "ScopeRef",
     "SessionId",
     "SessionRef",

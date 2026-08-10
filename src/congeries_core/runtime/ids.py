@@ -57,6 +57,14 @@ class ModelBindingRef(Identifier):
     """Registered model binding reference."""
 
 
+class ProviderId(Identifier):
+    """Registered provider identity."""
+
+
+class ModelId(Identifier):
+    """Provider-neutral model identity."""
+
+
 class CheckpointRef(Identifier):
     """Checkpoint reference."""
 

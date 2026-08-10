@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from congeries_core.policy.authorization import (
     AccessRequest,
     CorePrincipalKind,
@@ -12,6 +14,7 @@ from congeries_core.policy.authorization import (
 from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import CancellationToken, TraceContext
 from congeries_core.runtime.ids import PrincipalId
+from congeries_core.runtime.json_types import JsonValue
 from congeries_core.runtime.run import RunTransition
 from congeries_core.state.service import RunEventPublisher
 
@@ -61,6 +64,29 @@ class RuntimeEventPublisher(RunEventPublisher):
         )
         principal = RuntimePrincipal.core(
             CorePrincipalKind.RUN, PrincipalId(run.run_id.value)
+        )
+        await self._dispatcher.publish(event, context, principal)
+
+    async def provider_event(
+        self,
+        event_type: str,
+        context: RuntimeCallContext,
+        payload: Mapping[str, JsonValue],
+    ) -> None:
+        event = await self._dispatcher.create_event(
+            event_type=event_type,
+            schema_version="1",
+            run_id=context.run_id,
+            root_run_id=context.root_run_id,
+            parent_run_id=context.parent_run_id,
+            scope=context.scope,
+            context=context,
+            sensitivity=Sensitivity.INTERNAL,
+            delivery_class=DeliveryClass.OBSERVABILITY,
+            payload={key: PayloadField(value) for key, value in payload.items()},
+        )
+        principal = RuntimePrincipal.core(
+            CorePrincipalKind.RUN, PrincipalId(context.run_id.value)
         )
         await self._dispatcher.publish(event, context, principal)
 
