@@ -106,6 +106,8 @@ A provider may impose additional restrictions. It cannot broaden a Core grant.
 The v0.2 protected Provider actions are:
 
 - `core.context.capabilities`, `core.context.provide`
+- `core.memory.capabilities`, `core.memory.retrieve`, `core.memory.remember`,
+  `core.memory.forget`, `core.memory.consolidate`
 - `core.model.capabilities`, `core.model.generate`, `core.model.stream`
 
 All actions use version `1`. Context AccessRequests identify Provider resources
@@ -114,6 +116,13 @@ Provider/model pair and carry model, Tool exposure, and budget constraints. A
 grant may narrow Scope, keys, Tools, and budgets. It cannot change a requested
 model, add a key or Tool, increase a budget, or introduce an unknown constraint.
 Such expansion is an invalid grant and is denied before Provider invocation.
+
+Memory constraints are operation-specific. Retrieve grants preserve SchemaRef
+and filter keys while only shrinking projection and limit. Remember grants
+preserve SchemaRef while only shrinking metadata keys and maximum bytes. Forget
+grants preserve Memory identity and expected version. Consolidate grants
+preserve policy identity and selection keys. Unknown, malformed, or expanding
+Memory constraints are invalid grants and prevent Provider invocation.
 
 ## 7. Cross-Scope Access
 
@@ -163,11 +172,12 @@ A conforming implementation demonstrates:
 
 The Implemented status covers the common AuthorizedDispatcher boundary and all
 v0.2 capability paths that currently exist: ContextProvider capability and
-provide calls, ModelProvider capability, generate, and stream calls, and
-EventSink dispatch. Their non-bypass, default-deny, unknown-action, constraint,
-cross-scope audit, deadline, cancellation, and audit-failure behavior is covered
-by contract or integration tests.
+provide calls, MemoryProvider capability and operation calls, ModelProvider
+capability, generate, and stream calls, and EventSink dispatch. Their non-bypass,
+default-deny, unknown-action, constraint, cross-scope audit, deadline,
+cancellation, and audit-failure behavior is covered by contract or integration
+tests.
 
-Memory, Tool, Checkpoint, Storage, and MCP contracts are not implemented by this
-status. Each future capability must register versioned actions and reuse this
-boundary before its own delivery task may be marked Implemented.
+Tool, Checkpoint, Storage, and MCP contracts are not implemented by this status.
+Each future capability must register versioned actions and reuse this boundary
+before its own delivery task may be marked Implemented.

@@ -1,0 +1,52 @@
+[
+  {
+    "namespace": "core",
+    "name": "context.capabilities",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "context.provide",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "memory.capabilities",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "memory.retrieve",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "memory.remember",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "memory.forget",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "memory.consolidate",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "model.capabilities",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "model.generate",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "model.stream",
+    "version": "1"
+  }
+]

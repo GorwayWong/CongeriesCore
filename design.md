@@ -211,14 +211,24 @@ See [RFC-0006](docs/rfcs/RFC-0006-context-provider.md).
 
 ### 6.3 Memory Harness
 
-Core owns the MemoryProvider protocol only:
+Core owns an independent authorized Memory gateway:
 
 ```text
-retrieve | remember | forget | optional consolidate
+Caller -> MemoryGateway -> AuthorizedDispatcher -> MemoryProviderRegistry
+       -> retrieve | remember | forget | optional consolidate
 ```
 
-Memory implementation, ranking, schemas, embeddings, and persistence belong to
-plugins. See [RFC-0007](docs/rfcs/RFC-0007-memory-provider.md).
+MemoryGateway performs authorized capability discovery before every operation,
+validates content through SchemaRegistry, enforces cursor query fingerprints,
+and applies operation-specific grant narrowing. It actively cancels outstanding
+Provider work on cancellation or deadline and discards late results.
+
+MemoryProviderRegistry owns implementations. Query, item, and consolidation
+values contain references and JSON data rather than Provider or storage objects.
+AgentRuntime does not automatically retrieve or persist Memory in v0.2. Memory
+implementation, ranking, schemas, embeddings, consolidation algorithms, and
+persistence belong to plugins. See
+[RFC-0007](docs/rfcs/RFC-0007-memory-provider.md).
 
 ### 6.4 Approval and Evaluation
 
@@ -274,10 +284,11 @@ two delivery classes:
 Audit sink failure pauses the Run by default; execution policy may fail it.
 Runtime Events do not own execution state and do not imply Event Sourcing.
 
-Context resolution and Model invocation emit redacted OBSERVABILITY events with
-references, counts, usage, latency, outcome, and safe error codes. They never
-include Context values, prompts, or generated output. Their delivery failure does
-not alter Run state.
+Context resolution, Memory operations, and Model invocation emit redacted
+OBSERVABILITY events with references, counts, usage, latency, outcome, and safe
+error codes. They never include Context or Memory values, query content,
+metadata, cursors, provenance content, prompts, or generated output. Their
+delivery failure does not alter Run state.
 
 ```text
 RuntimeEvent

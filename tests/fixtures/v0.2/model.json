@@ -1,0 +1,27 @@
+{
+  "ref": "model-binding-a",
+  "selector": {
+    "provider_id": "model-a",
+    "model_id": "chat-a"
+  },
+  "required": {
+    "streaming": false,
+    "structured_output": false,
+    "tool_calls": false,
+    "input_kinds": [
+      "text"
+    ],
+    "output_kinds": [
+      "text"
+    ]
+  },
+  "default_policy": {
+    "allow_partial": false,
+    "allow_tool_requests": false
+  },
+  "default_budget": {
+    "max_input_units": null,
+    "max_output_units": null
+  },
+  "fallbacks": []
+}

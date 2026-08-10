@@ -1,0 +1,66 @@
+{
+  "agent_id": "agent-a",
+  "definition_id": "definition-a",
+  "instructions": [
+    {
+      "kind": "text",
+      "value": "You are concise.",
+      "name": null,
+      "media_type": "text/plain"
+    }
+  ],
+  "skill_refs": [],
+  "tool_refs": [],
+  "context_binding": {
+    "provider_ids": [
+      "context-a"
+    ],
+    "requirements": [
+      {
+        "key": {
+          "namespace": "test",
+          "name": "profile"
+        },
+        "schema": {
+          "namespace": "test",
+          "name": "profile",
+          "version": "1"
+        }
+      }
+    ],
+    "merge_strategy": "single",
+    "completeness_policy": "require_complete",
+    "budget": {
+      "max_bytes": null,
+      "max_tokens": null
+    }
+  },
+  "policy_ref": null,
+  "model_binding": {
+    "ref": "model-binding-a",
+    "selector": {
+      "provider_id": "model-a",
+      "model_id": "chat-a"
+    },
+    "required": {
+      "streaming": false,
+      "structured_output": false,
+      "tool_calls": false,
+      "input_kinds": [
+        "text"
+      ],
+      "output_kinds": [
+        "text"
+      ]
+    },
+    "default_policy": {
+      "allow_partial": false,
+      "allow_tool_requests": false
+    },
+    "default_budget": {
+      "max_input_units": null,
+      "max_output_units": null
+    },
+    "fallbacks": []
+  }
+}

@@ -91,6 +91,9 @@ Core event types include:
 - `core.model.invocation_started`
 - `core.model.invocation_completed`
 - `core.model.invocation_failed`
+- `core.memory.operation_started`
+- `core.memory.operation_completed`
+- `core.memory.operation_failed`
 - `core.checkpoint.saved`
 - `core.checkpoint.failed`
 - `core.artifact.created`
@@ -102,6 +105,10 @@ Plugins use namespaced business event types outside the Core catalog.
 
 Event payloads contain references and summaries by default, not Context, Memory,
 model prompt, Tool secret, or Artifact content.
+
+Memory operation event payloads are limited to operation, Provider reference,
+record or affected count, completeness or outcome, latency, and safe error code.
+They exclude query, content, metadata, cursor, and provenance content.
 
 Redaction policy applies before sink dispatch. A sink never receives data beyond
 its authorized Scope and sensitivity grant. Redaction failure blocks AUDIT

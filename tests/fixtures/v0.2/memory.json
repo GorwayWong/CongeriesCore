@@ -1,0 +1,155 @@
+{
+  "query": {
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "content": {
+      "kind": "json",
+      "value": {
+        "value": "find"
+      },
+      "name": null,
+      "media_type": "application/json"
+    },
+    "schema": {
+      "namespace": "test",
+      "name": "memory-query",
+      "version": "1"
+    },
+    "filters": {
+      "test.kind": "note"
+    },
+    "limit": 10,
+    "projection": [
+      "core.content",
+      "core.metadata"
+    ],
+    "cursor": null
+  },
+  "item": {
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "content": {
+      "kind": "json",
+      "value": {
+        "value": "remembered"
+      },
+      "name": null,
+      "media_type": "application/json"
+    },
+    "schema": {
+      "namespace": "test",
+      "name": "memory-item",
+      "version": "1"
+    },
+    "idempotency_key": "idempotency-1",
+    "metadata": {
+      "test.source": "fixture"
+    },
+    "provenance": [
+      "fixture"
+    ],
+    "retention": null,
+    "max_bytes": 1000
+  },
+  "page": {
+    "provider_id": "memory-a",
+    "contract_version": "1",
+    "records": [
+      {
+        "ref": {
+          "provider_id": "memory-a",
+          "memory_id": "memory-1",
+          "scope": {
+            "namespace": "core",
+            "kind": "workspace",
+            "id": "workspace-1",
+            "parent": null
+          },
+          "version": 1
+        },
+        "content": {
+          "kind": "json",
+          "value": {
+            "value": "remembered"
+          },
+          "name": null,
+          "media_type": "application/json"
+        },
+        "schema": {
+          "namespace": "test",
+          "name": "memory-item",
+          "version": "1"
+        },
+        "metadata": {
+          "test.source": "fixture"
+        },
+        "provenance": [
+          "fixture"
+        ]
+      }
+    ],
+    "next_cursor": null,
+    "completeness": "complete",
+    "warnings": [],
+    "provenance": [
+      "fixture-provider"
+    ]
+  },
+  "capabilities": {
+    "provider_id": "memory-a",
+    "contract_version": "1",
+    "operations": [
+      "consolidate",
+      "forget",
+      "remember",
+      "retrieve"
+    ],
+    "query_schemas": [
+      {
+        "namespace": "test",
+        "name": "memory-query",
+        "version": "1"
+      }
+    ],
+    "item_schemas": [
+      {
+        "namespace": "test",
+        "name": "memory-item",
+        "version": "1"
+      }
+    ],
+    "record_schemas": [
+      {
+        "namespace": "test",
+        "name": "memory-item",
+        "version": "1"
+      }
+    ],
+    "content_kinds": [
+      "json"
+    ],
+    "maximum_result_limit": 100,
+    "projections": [
+      "core.content",
+      "core.metadata"
+    ],
+    "versioned": true,
+    "consolidation_policies": [
+      {
+        "namespace": "test",
+        "kind": "memory_policy",
+        "id": "compact",
+        "owning_extension": null
+      }
+    ],
+    "maximum_item_bytes": 2000
+  }
+}

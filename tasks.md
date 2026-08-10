@@ -26,25 +26,24 @@ follow-up work.
 | --- | --- | --- |
 | Project and shared types | Implemented | Python 3.12 package, typed identifiers, JSON boundary, deadlines, cancellation, trace, and structured errors |
 | Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repository, Session lifecycle, and Workspace versioning |
-| Scope and Authorization | Implemented | Generic Scope model, default-deny AuthorizedDispatcher, audit integration, and non-bypass Context, Model, and EventSink paths |
+| Scope and Authorization | Implemented | Generic Scope model, default-deny AuthorizedDispatcher, audit integration, and non-bypass Context, Memory, Model, and EventSink paths |
 | Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
 | Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, and initial state repositories; approval, evaluation, checkpoint, Artifact storage, and provider-wide storage contracts remain |
-| Context, Model, and direct Agent execution | Implemented | Authorized Context resolution, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
-| Memory, Workflow, Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
+| Context, Memory, Model, and direct Agent execution | Implemented | Authorized Context resolution, independent Memory operations, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
+| Workflow, Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
 
 ### 1.3 Next Recommended Milestone
 
-The next milestone is **MemoryProvider and remaining capability-boundary
-coverage**. Deliver it in this dependency order:
+The next milestone is **Workflow reliability prerequisites and remaining
+compatibility coverage**. Deliver it in this dependency order:
 
-1. Implement Task 3.2 MemoryProvider with retrieve, remember, forget, and
-   optional consolidate capability reporting.
-2. Route every Memory operation through AuthorizedDispatcher and add the same
-   non-bypass, deadline, cancellation, audit, and redaction contract tests.
-3. Advance Task 6.3 with compatibility fixtures for the implemented Context,
-   Model, AgentSpec, and event schemas.
-4. Begin Workflow execution only after checkpoint and approval boundaries are
-   ready to preserve the existing Run reliability contract.
+1. Define the CheckpointStore contract and graph-version migration boundary in
+   Task 4.2 before executing Workflow graphs.
+2. Implement approval persistence and recovery semantics needed by Task 4.3.
+3. Continue Task 6.3 with fixtures for Plugin manifests, Checkpoints, and future
+   storage contracts as those public schemas become implemented.
+4. Begin direct Workflow graph execution only after checkpoint and approval
+   boundaries preserve the existing Run reliability contract.
 
 Tool and MCP tasks must register their actions and reuse the implemented
 AuthorizedDispatcher boundary before they may be marked Implemented.
@@ -134,14 +133,16 @@ Delivered:
   cancellation, and audit gates
 - Audit failure integration with PAUSED or policy-selected FAILED Run control
 - Authorized Context capability and provide paths with key and budget narrowing
+- Authorized Memory capability, retrieve, remember, forget, and consolidate
+  paths with operation-specific constraint narrowing
 - Authorized Model capability, generate, and stream paths with model, Tool, and
   budget narrowing
 - Existing EventSink paths share the boundary
 - Non-bypass, unknown-action, cancellation, deadline, invalid-grant, and
   audit-failure integration coverage
 
-Future Memory, Tool, Checkpoint, Storage, and MCP tasks must register actions
-and reuse this boundary before their individual task status becomes Implemented.
+Future Tool, Checkpoint, Storage, and MCP tasks must register actions and reuse
+this boundary before their individual task status becomes Implemented.
 
 Implement ScopeRef, runtime principals, AccessRequest, PolicyDecision, and
 AuthorizationPolicy with default-deny behavior.
@@ -179,7 +180,7 @@ Acceptance:
 
 ### Task 3.2 MemoryProvider
 
-Status: Not Started
+Status: Implemented in 0.2.0
 
 Implement `retrieve`, `remember`, `forget`, and optional `consolidate` contracts
 with Scope, pagination, idempotency, and structured results.
@@ -297,8 +298,8 @@ Delivered:
   failure, and cancellation lifecycle operations
 - State-version compare-and-set and competing completion/cancellation coverage
 - Deadline and cancellation primitives propagated by RuntimeCallContext
-- Active Context and Model Provider calls are cancelled while Core awaits them;
-  late results and post-terminal stream events are discarded
+- Active Context, Memory, and Model Provider calls are cancelled while Core
+  awaits them; late results and post-terminal stream events are discarded
 
 Remaining:
 
@@ -411,7 +412,19 @@ Acceptance:
 
 ### Task 6.3 Compatibility Suite
 
-Status: Not Started
+Status: In Progress
+
+Delivered:
+
+- Stable v0.2 JSON fixtures for Content, ContextBinding, ModelBinding, AgentSpec,
+  Memory contracts, the Provider action catalog, and the Core event catalog
+- Exact deserialize, equality, and reserialize checks for delivered fixtures
+
+Remaining:
+
+- Plugin manifest, Checkpoint, Workflow, and storage contract fixtures after
+  those public schemas are implemented
+- Migration fixtures and compatibility checks for future contract versions
 
 Add compatibility fixtures for public schemas, provider contracts, plugin
 manifests, event envelopes, and checkpoint formats.

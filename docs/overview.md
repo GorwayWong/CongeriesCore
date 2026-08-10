@@ -87,6 +87,11 @@ registries. AgentSpec, ContextBinding, and ModelBinding contain references, not
 live Provider or vendor SDK objects. Context and Model calls cannot bypass
 AuthorizedDispatcher.
 
+MemoryProvider is an independent authorized gateway in v0.2. Callers explicitly
+select a registered Provider and invoke retrieve, remember, forget, or optional
+consolidate operations. AgentRuntime does not automatically read or write
+Memory.
+
 Run transitions are committed with compare-and-set before their state-change
 events are published. Context resolution and Model invocation also emit redacted
 observability events. Observability failure does not change Run outcome;
@@ -107,10 +112,13 @@ The verified direct Agent slice includes:
 - Exactly one terminal Model stream event and cleanup of closable streams
 - Root AgentRun execution without a Plugin, Skill, Tool, MemoryProvider, or
   Workflow
+- Authorized Memory capability discovery, pagination, idempotent mutation,
+  optional consolidation, cancellation cleanup, and redacted operation events
+- Stable v0.2 compatibility fixtures for Content, Context, Model, AgentSpec,
+  Memory, Provider actions, and Core event catalogs
 
 The following remain outside this implemented slice:
 
-- Persistent MemoryProvider behavior
 - Model-driven Tool execution loops
 - Workflow graph execution and checkpoint recovery
 - Approval and evaluation coordination

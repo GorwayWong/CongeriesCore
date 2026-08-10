@@ -1,0 +1,24 @@
+{
+  "provider_ids": [
+    "context-a"
+  ],
+  "requirements": [
+    {
+      "key": {
+        "namespace": "test",
+        "name": "profile"
+      },
+      "schema": {
+        "namespace": "test",
+        "name": "profile",
+        "version": "1"
+      }
+    }
+  ],
+  "merge_strategy": "single",
+  "completeness_policy": "require_complete",
+  "budget": {
+    "max_bytes": null,
+    "max_tokens": null
+  }
+}

@@ -28,6 +28,33 @@ from .context import (
     context_actions,
 )
 from .events import NullProviderEventPublisher, ProviderEventPublisher
+from .memory import (
+    MEMORY_CAPABILITIES_ACTION,
+    MEMORY_CONSOLIDATE_ACTION,
+    MEMORY_FORGET_ACTION,
+    MEMORY_REMEMBER_ACTION,
+    MEMORY_RETRIEVE_ACTION,
+    ConsolidateRequest,
+    ConsolidationOutcome,
+    ConsolidationReport,
+    ForgetOutcome,
+    ForgetRequest,
+    ForgetResult,
+    MemoryCapabilities,
+    MemoryCompleteness,
+    MemoryCursor,
+    MemoryGateway,
+    MemoryItem,
+    MemoryOperation,
+    MemoryPage,
+    MemoryProvider,
+    MemoryProviderRegistry,
+    MemoryQuery,
+    MemoryRecord,
+    MemoryRef,
+    MemoryWarning,
+    memory_actions,
+)
 from .model import (
     MODEL_CAPABILITIES_ACTION,
     MODEL_GENERATE_ACTION,
@@ -54,15 +81,23 @@ from .model import (
 
 
 def provider_actions() -> tuple[ActionRef, ...]:
-    return (*context_actions(), *model_actions())
+    return (*context_actions(), *memory_actions(), *model_actions())
 
 
 __all__ = [
     "CONTEXT_CAPABILITIES_ACTION",
     "CONTEXT_PROVIDE_ACTION",
+    "MEMORY_CAPABILITIES_ACTION",
+    "MEMORY_CONSOLIDATE_ACTION",
+    "MEMORY_FORGET_ACTION",
+    "MEMORY_REMEMBER_ACTION",
+    "MEMORY_RETRIEVE_ACTION",
     "MODEL_CAPABILITIES_ACTION",
     "MODEL_GENERATE_ACTION",
     "MODEL_STREAM_ACTION",
+    "ConsolidateRequest",
+    "ConsolidationOutcome",
+    "ConsolidationReport",
     "ContextBinding",
     "ContextBudget",
     "ContextCapabilities",
@@ -82,6 +117,22 @@ __all__ = [
     "ContextScopePattern",
     "ContextUsage",
     "ContextWarning",
+    "ForgetOutcome",
+    "ForgetRequest",
+    "ForgetResult",
+    "MemoryCapabilities",
+    "MemoryCompleteness",
+    "MemoryCursor",
+    "MemoryGateway",
+    "MemoryItem",
+    "MemoryOperation",
+    "MemoryPage",
+    "MemoryProvider",
+    "MemoryProviderRegistry",
+    "MemoryQuery",
+    "MemoryRecord",
+    "MemoryRef",
+    "MemoryWarning",
     "ModelBinding",
     "ModelBudget",
     "ModelCapabilities",
@@ -103,6 +154,7 @@ __all__ = [
     "ResolvedContext",
     "ToolCallProposal",
     "context_actions",
+    "memory_actions",
     "model_actions",
     "provider_actions",
 ]

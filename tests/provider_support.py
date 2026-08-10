@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from congeries_core.policy.authorization import (
     AccessRequest,
     ActionRegistry,
+    AuthorizationPolicy,
     AuthorizedDispatcher,
     Grant,
     PolicyDecision,
@@ -35,9 +36,9 @@ from .support import NOW, FixedClock
 
 @dataclass(slots=True)
 class RecordingPolicy:
-    constraints: Mapping[str, JsonValue] = field(default_factory=dict)
-    denied_actions: set[str] = field(default_factory=set)
-    requests: list[AccessRequest] = field(default_factory=list)
+    constraints: Mapping[str, JsonValue] = field(default_factory=lambda: {})
+    denied_actions: set[str] = field(default_factory=lambda: set())
+    requests: list[AccessRequest] = field(default_factory=lambda: [])
 
     async def authorize(self, request: AccessRequest) -> PolicyDecision:
         self.requests.append(request)
@@ -61,8 +62,8 @@ class RecordingPolicy:
 
 @dataclass(slots=True)
 class AuditRecorder:
-    denied: list[AccessRequest] = field(default_factory=list)
-    cross_scope: list[AccessRequest] = field(default_factory=list)
+    denied: list[AccessRequest] = field(default_factory=lambda: [])
+    cross_scope: list[AccessRequest] = field(default_factory=lambda: [])
     fail: bool = False
 
     async def authorization_denied(
@@ -82,7 +83,7 @@ class AuditRecorder:
 
 @dataclass(slots=True)
 class FailureRecorder:
-    errors: list[ErrorDetail] = field(default_factory=list)
+    errors: list[ErrorDetail] = field(default_factory=lambda: [])
 
     async def handle(self, run_id: object, error: ErrorDetail) -> None:
         del run_id
@@ -90,7 +91,7 @@ class FailureRecorder:
 
 
 def authorized_dispatcher(
-    policy: RecordingPolicy | None = None,
+    policy: AuthorizationPolicy | None = None,
     *,
     audit: AuditRecorder | None = None,
     failures: FailureRecorder | None = None,
@@ -107,7 +108,9 @@ def authorized_dispatcher(
 
 @dataclass(slots=True)
 class ProviderEventRecorder:
-    events: list[tuple[str, Mapping[str, JsonValue]]] = field(default_factory=list)
+    events: list[tuple[str, Mapping[str, JsonValue]]] = field(
+        default_factory=lambda: []
+    )
     fail: bool = False
 
     async def provider_event(
@@ -124,7 +127,7 @@ class FakeContextProvider(ContextProvider):
     declared_capabilities: ContextCapabilities
     result: ContextResult | Exception
     capability_calls: int = 0
-    provide_calls: list[ContextRequest] = field(default_factory=list)
+    provide_calls: list[ContextRequest] = field(default_factory=lambda: [])
 
     async def capabilities(self, context: object) -> ContextCapabilities:
         del context
@@ -144,8 +147,8 @@ class FakeModelProvider(ModelProvider):
     response: ModelResponse | Exception
     stream_events: tuple[ModelEvent, ...]
     capability_calls: int = 0
-    generate_calls: list[ModelRequest] = field(default_factory=list)
-    stream_calls: list[ModelRequest] = field(default_factory=list)
+    generate_calls: list[ModelRequest] = field(default_factory=lambda: [])
+    stream_calls: list[ModelRequest] = field(default_factory=lambda: [])
     stream_closed: bool = False
 
     async def capabilities(

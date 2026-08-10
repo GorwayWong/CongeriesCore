@@ -102,6 +102,23 @@ def core_schema_registry() -> EventSchemaRegistry:
             "latency_ms",
             "outcome",
         ),
+        CoreEventType.MEMORY_OPERATION_STARTED: ("operation", "provider_id"),
+        CoreEventType.MEMORY_OPERATION_COMPLETED: (
+            "operation",
+            "provider_id",
+            "record_count",
+            "affected_count",
+            "outcome",
+            "latency_ms",
+        ),
+        CoreEventType.MEMORY_OPERATION_FAILED: (
+            "operation",
+            "provider_id",
+            "error_code",
+            "category",
+            "outcome",
+            "latency_ms",
+        ),
         CoreEventType.AUTHORIZATION_DENIED: (
             "principal",
             "action",

@@ -65,6 +65,10 @@ class ModelId(Identifier):
     """Provider-neutral model identity."""
 
 
+class MemoryId(Identifier):
+    """Provider-neutral persistent memory identity."""
+
+
 class CheckpointRef(Identifier):
     """Checkpoint reference."""
 
