@@ -5,95 +5,90 @@ Version: 0.2.0
 ## 1. Purpose
 
 This file is the navigation map and contribution guide for AI coding agents.
-It does not redefine the product requirements, architecture, principles, or
-delivery plan. Follow the linked specification documents as their source of
-truth.
+It does not redefine product requirements, architecture, public contracts, or
+delivery plans. Follow the linked document that owns each decision.
 
-Keep this file concise and below 500 lines. Put detailed product decisions in
-the document that owns them, then link to that document from here if additional
-navigation is needed.
+Keep this file below 500 lines. Put detailed decisions in their owning document
+and link to them instead of copying them here.
 
-## 2. Specification Map
+## 2. Documentation Map
 
-| Document | Owns | Read when |
+| Document | Authority and ownership | Read when |
 | --- | --- | --- |
-| [principles.md](principles.md) | Long-term architectural invariants and design review constraints | Evaluating whether a capability belongs in Core |
-| [requirements.md](requirements.md) | Product scope, goals, non-goals, required capabilities, and quality attributes | Adding or changing observable Core behavior |
-| [design.md](design.md) | Architecture, component responsibilities, runtime concepts, and integration boundaries | Changing interfaces, data flow, lifecycle, or module relationships |
-| [tasks.md](tasks.md) | Delivery phases, implementation work, dependencies, and acceptance criteria | Planning, sequencing, or completing implementation work |
+| [principles.md](principles.md) | Long-term architectural invariants | Deciding whether a capability belongs in Core |
+| [requirements.md](requirements.md) | Product scope, required behavior, and quality attributes | Changing observable Core behavior |
+| [docs/adrs/README.md](docs/adrs/README.md) | Accepted cross-cutting architectural decisions | Understanding why a durable decision was made |
+| [design.md](design.md) | Current system architecture and composition of public contracts | Changing responsibilities, data flow, or module relationships |
+| [docs/rfcs/README.md](docs/rfcs/README.md) | Detailed public contracts; an Accepted RFC is normative within its scope | Changing an interface, lifecycle, schema, or execution semantic |
+| [tasks.md](tasks.md) | Delivery phases and testable acceptance criteria | Planning or completing implementation work |
+| [docs/overview.md](docs/overview.md) | Non-normative orientation and navigation | Learning the system for the first time |
+| [docs/README.md](docs/README.md) | Document registry and governance | Adding, moving, or superseding documents |
 | [agents.md](agents.md) | Repository navigation and contributor workflow | Before making any repository change |
 
 Use the map by ownership:
 
-- Start with `principles.md` to test the architecture boundary.
-- Use `requirements.md` to determine what the system must or must not do.
-- Use `design.md` to determine how the requirement is represented in the
-  architecture.
-- Use `tasks.md` to determine when and how the work is delivered.
-- Use this file only for the process used to make the change safely.
+1. Test the change against `principles.md`.
+2. Confirm required behavior in `requirements.md`.
+3. Check accepted ADRs for cross-cutting decisions.
+4. Use `design.md` for the current architecture.
+5. Read the owning Accepted RFC for detailed contract semantics.
+6. Use `tasks.md` for delivery order and acceptance criteria.
 
 ## 3. Authority and Conflict Resolution
 
-Resolve conflicts by document ownership, not by duplicating or blending text.
+Documents have authority by subject, not simply by publication date.
 
-1. `principles.md` governs architectural invariants.
-2. `requirements.md` governs product scope and required behavior and must
-   comply with the principles.
-3. `design.md` governs the technical design and must satisfy both the
-   principles and requirements.
-4. `tasks.md` governs delivery sequencing and must not introduce new product
-   requirements or architecture.
-5. `agents.md` governs contribution workflow only and must not override any
-   specification document.
+- Principles override every downstream document.
+- Requirements must comply with principles and own product behavior.
+- Accepted ADRs own cross-cutting decisions but cannot weaken requirements.
+- Design must reflect principles, requirements, and accepted ADRs.
+- An Accepted RFC owns the detailed contract in its declared scope and must be
+  synchronized with design.
+- Tasks cannot introduce new requirements or architecture.
+- Overview and migration pages are non-normative.
+- This guide governs contribution workflow only.
 
 When documents disagree:
 
-1. Identify the type of decision and its owning document.
+1. Identify the decision type and owning document.
 2. Treat the higher-level invariant or requirement as authoritative.
-3. Update the incorrect downstream document in the same change when possible.
-4. Do not preserve contradictory alternatives without explicitly marking an
-   unresolved decision.
-5. If intent cannot be determined safely, stop and request a design decision.
+3. For equal-level conflicts, prefer an Accepted document over Draft or
+   Superseded material.
+4. Update every affected downstream document in the same change.
+5. Do not preserve contradictory alternatives unless they are explicitly
+   recorded as an unresolved Draft RFC question.
 
 ## 4. Specification Writing Policy
 
-All additions and modifications to the specification and design documents
-listed below MUST be written in English:
-
-- `principles.md`
-- `requirements.md`
-- `design.md`
-- `tasks.md`
-- `agents.md`
-
-This rule applies to headings, prose, tables, diagram labels, examples,
-acceptance criteria, and normative statements. Preserve code identifiers and
-external names exactly when required.
+All additions and modifications to specifications, designs, RFCs, ADRs,
+registries, migration pages, and this guide MUST be written in English. This
+includes headings, prose, tables, diagram labels, examples, acceptance criteria,
+and normative statements. Preserve external names and code identifiers exactly.
 
 Keep each decision in one owning document:
 
-- Put enduring constraints in `principles.md`.
-- Put externally meaningful scope and behavior in `requirements.md`.
-- Put interfaces, responsibilities, state transitions, and execution semantics
-  in `design.md`.
-- Put implementation order and testable completion criteria in `tasks.md`.
-- Put contributor navigation and workflow rules in `agents.md`.
+- Enduring constraints belong in `principles.md`.
+- Externally meaningful behavior belongs in `requirements.md`.
+- Cross-cutting decision rationale belongs in one ADR.
+- Current architecture and relationships belong in `design.md`.
+- Detailed interfaces and execution semantics belong in one RFC.
+- Delivery order and verifiable completion criteria belong in `tasks.md`.
+- Orientation belongs in `docs/overview.md`.
 
-Prefer relative Markdown links and section references over copied paragraphs.
-When a specification change affects multiple ownership levels, update the
-affected documents together so they remain consistent.
+Use relative Markdown links instead of copied normative paragraphs. Follow the
+metadata and status rules in [docs/README.md](docs/README.md).
 
 ## 5. Architectural Guardrails
 
-These are navigation-level guardrails. The complete rationale and definitions
-remain in `principles.md`, `requirements.md`, and `design.md`.
+These are navigation-level guardrails. The owning definitions remain in the
+principles, requirements, design, ADRs, and RFCs.
 
 ### 5.1 Keep Core business-independent
 
-Core may understand runtime concepts such as Agent, Workflow, Skill, Tool,
-Context, Workspace, Artifact, and Policy. It must not contain business entity
-models, user models, industry concepts, application workflows, or
-domain-specific memory schemas.
+Core may understand runtime concepts such as Agent, Workflow, Run, Skill, Tool,
+Context, Scope, Workspace, SessionRef, Artifact, Policy, and Provider. It must
+not contain business entities, user models, industries, application workflows,
+or domain-specific memory schemas.
 
 Never add business-specific directories or branches such as:
 
@@ -107,123 +102,96 @@ if business_type == ...
 
 ### 5.2 Prefer extension points
 
-Before changing Core, determine whether the capability belongs in a:
+Before changing Core, determine whether the capability belongs in a Plugin,
+Provider, Adapter, Workflow, or Skill. Add Core capability only when it is
+universally required and cannot be expressed safely through an extension.
 
-- Plugin
-- Provider
-- Adapter
-- Workflow
-- Skill
+### 5.3 Depend on explicit interfaces
 
-Add a Core capability only when it is universally required by multiple use
-cases and cannot be expressed safely through an existing extension point.
+External capability must be reached through explicit interfaces and dependency
+injection. Do not couple Core to an LLM vendor, database, vector store, workflow
+framework, transport, or application service.
 
-### 5.3 Depend on interfaces
+### 5.4 Keep authority and state explicit
 
-External capabilities must be reached through explicit interfaces and
-dependency injection. Provider and adapter implementations must remain
-replaceable. Do not couple Core directly to an LLM vendor, database, vector
-store, workflow framework, or application service.
+Context, memory, models, tools, and MCP calls must receive a runtime call
+context and pass authorization. Avoid hidden global state, implicit database
+access, uncontrolled context injection, and default-allow behavior.
 
-### 5.4 Separate runtime from orchestration
+### 5.5 Preserve reliable execution
 
-- Agent Runtime owns composition, configuration, lifecycle, execution, and
-  runtime state.
-- Workflow Runtime executes workflow definitions and node graphs.
-- Plugins define business workflows and domain behavior.
-- Skills provide reusable capabilities; they do not own business lifecycle or
-  global application state.
-- Tools expose bounded external actions with explicit schemas, permissions, and
-  execution policies.
-
-### 5.5 Keep context and state explicit
-
-Context must enter through explicit providers and resolvers. Avoid hidden global
-state, implicit database access, uncontrolled context injection, and magic
-runtime behavior.
+Run transitions, checkpoint boundaries, cancellation, retry, recovery, approval,
+and audit delivery must be observable and testable. Side-effecting operations
+must follow the idempotency contract defined by the owning RFC.
 
 ## 6. Change Workflow
 
 For every change:
 
-1. Classify it as a principle, requirement, design, task, implementation, or
-   documentation change.
-2. Read the owning specification and any higher-level documents it depends on.
+1. Classify it as a principle, requirement, ADR, design, RFC, task,
+   implementation, or documentation change.
+2. Read the owning document and all higher-level documents it depends on.
 3. Confirm that the capability belongs in Core rather than an extension.
-4. Identify the interface, provider, adapter, plugin, workflow, or skill boundary.
-5. Update affected specifications first when behavior or architecture changes.
-6. Implement the smallest coherent change with explicit interfaces and
-   dependency injection.
-7. Add tests proportional to the affected contract and failure modes.
-8. Update acceptance criteria and delivery status in `tasks.md` when applicable.
-9. Verify that documentation, implementation, and tests describe the same
-   behavior.
+4. Identify the affected interface, provider, adapter, plugin, workflow, or
+   state boundary.
+5. Update affected specifications before implementation when behavior or
+   architecture changes.
+6. Implement the smallest coherent change with explicit interfaces.
+7. Add tests for the contract, lifecycle, permissions, and failure modes.
+8. Update `tasks.md` acceptance criteria and status when applicable.
+9. Verify that documentation, implementation, and tests agree.
 
-Do not modify a specification merely to justify an implementation that violates
+Do not change a specification merely to justify an implementation that violates
 an existing principle. Escalate the architectural decision instead.
 
 ## 7. Specification Change Checklist
 
 Before completing a specification or design change, verify:
 
-- The owning document contains the decision and other documents link or defer
-  to it.
+- The decision exists in exactly one owning document.
+- Required metadata, status, version, and cross-links are present.
 - The text is written in English.
-- Core and plugin responsibilities are explicit.
-- Public inputs, outputs, errors, lifecycle, and state transitions are defined
-  where relevant.
-- Provider and adapter boundaries are replaceable.
-- Permission and execution boundaries are defined for tools and integrations.
-- Recovery, timeout, retry, cancellation, and observability implications are
-  considered.
-- Compatibility impact and migration requirements are documented.
-- `tasks.md` contains testable acceptance criteria for implementation work.
+- Core and extension responsibilities are explicit.
+- Public inputs, outputs, errors, lifecycle, and state transitions are defined.
+- Provider and adapter boundaries remain replaceable.
+- Scope, authorization, audit, and redaction implications are defined.
+- Retry, timeout, cancellation, recovery, and idempotency are considered.
+- Compatibility or migration impact is documented.
+- `tasks.md` contains testable implementation acceptance criteria.
 
 ## 8. Testing Expectations
 
 New or changed Core behavior requires appropriate coverage:
 
-- Unit tests for interfaces, lifecycle, state transitions, validation, and
-  runtime behavior.
-- Integration tests for workflow execution, plugin loading, provider
-  interaction, and adapter boundaries.
+- Unit tests for interfaces, lifecycle transitions, validation, authorization,
+  idempotency, and runtime behavior.
+- Integration tests for workflow execution, checkpoints, plugin lifecycle,
+  provider interaction, event sinks, and adapter boundaries.
 - Compatibility tests when public APIs, manifests, schemas, or plugin contracts
   change.
 
-Tests must cover failure paths relevant to the change, including timeout,
-retry, cancellation, recovery, invalid schemas, denied permissions, and provider
-failures when applicable.
+Tests must cover relevant failure paths, including timeout, retry, cancellation,
+recovery, invalid schema, denied permission, provider failure, audit sink
+failure, graph version mismatch, and drain timeout.
 
 ## 9. Implementation Style
 
-Prefer:
+Prefer explicit small interfaces, dependency injection, typed schemas, clear
+ownership, observable lifecycle transitions, and minimal mandatory dependencies.
 
-- Explicit, small interfaces
-- Dependency injection
-- Small modules with clear ownership
-- Clear naming and typed schemas
-- Observable lifecycle transitions
-- Minimal mandatory dependencies
-
-Avoid:
-
-- Hidden state and implicit dependencies
-- Unbounded tool access
-- Domain-specific conditionals in Core
-- Framework-specific contracts exposed as Core APIs
-- Excessive abstraction without multiple concrete use cases
-- Breaking changes without migration guidance
+Avoid hidden state, unbounded tool access, domain conditionals in Core,
+framework-specific public contracts, speculative abstraction, and breaking
+changes without migration guidance.
 
 ## 10. Completion Standard
 
 A change is complete only when:
 
 - It respects the architecture boundary.
-- The owning specifications are consistent and written in English.
+- The owning documents are synchronized and written in English.
 - Implementation and tests satisfy the documented contract.
-- Existing plugin and provider compatibility is preserved or migration is
-  documented.
-- Relevant acceptance criteria are verifiable.
+- Compatibility is preserved or migration is documented.
+- Acceptance criteria are verifiable.
 
-The guiding principle remains: Core becomes more powerful by becoming more
-abstract, while application-specific capability remains removable and external.
+Core becomes more powerful by becoming more abstract, while application-specific
+capability remains removable and external.
