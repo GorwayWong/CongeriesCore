@@ -411,8 +411,18 @@ See [RFC-0002](docs/rfcs/RFC-0002-plugin-sdk.md).
 
 ## 11. MCP and Application Integration
 
-MCP is a scoped capability gateway for Tool and Context capability. It is not a
-CRUD gateway. MCP calls use RuntimeCallContext and AuthorizationPolicy.
+MCP is a client-side adapter for scoped remote Tool and Context capability. It
+is not a CRUD gateway. Explicit bindings map remote Tools to local Tool v1
+capabilities and exact remote resource URIs to local ContextProvider
+capabilities. Calls enter only through ToolGateway or ContextResolver and reuse
+RuntimeCallContext, AuthorizedDispatcher, local SchemaRegistry validation, and
+Plugin execution leases.
+
+The version 1 adapter is transport-neutral, consumes only MCP revision
+`2026-07-28`, and does not require an MCP SDK. Discovery verifies frozen
+bindings but never mutates the Plugin registry or installs remote Schemas.
+Legacy initialize/session protocols and real wire transports remain optional
+extension concerns. See [RFC-0014](docs/rfcs/RFC-0014-mcp-adapter.md).
 
 HTTP frameworks, API schemas, user sessions, and application services stay
 outside Core:

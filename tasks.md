@@ -588,7 +588,7 @@ Acceptance:
 
 ### Task 5.3 MCP Adapter
 
-Status: Not Started
+Status: In Progress (RFC-0014 Accepted)
 
 Implement capability discovery, schema mapping, Context and Tool integration,
 and policy enforcement.

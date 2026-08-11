@@ -192,6 +192,8 @@ cancellation, and audit-failure behavior is covered by contract or integration
 tests.
 
 General StorageProvider and MCP contracts are not implemented by this status.
-Each future capability must register versioned actions and reuse this boundary
-before its own delivery task may be marked Implemented. Skill and Tool grant
+RFC-0014 accepts the MCP Adapter composition but does not extend this coverage
+until its authorization and dual-transport conformance tests are verified. Each
+future capability must register versioned actions and reuse this boundary before
+its own delivery task may be marked Implemented. Skill and Tool grant
 constraints and execution order are defined by RFC-0013.

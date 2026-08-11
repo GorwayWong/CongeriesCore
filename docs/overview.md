@@ -137,13 +137,15 @@ The verified direct Agent slice includes:
 - Immutable Skill/Tool v1 contracts, typed Plugin-registry views, progressive
   Skill resource reads, schema-aware Tool execution, in-lease retry, and
   AgentSpec v1/v2 compatibility
+- Accepted transport-neutral MCP Adapter v1 contract for explicit remote Tool
+  and exact-resource Context bindings on protocol revision `2026-07-28`
 
 The following remain outside this implemented slice:
 
 - Model-driven Tool execution loops
 - Skill, Tool, Context, and custom Workflow node execution
 - Parallel scheduling and external Workflow engine adapters
-- MCP capability adapters
+- MCP Adapter implementation and transport contract coverage
 
 These future capability families must reuse the implemented authorization,
 RuntimeCallContext, cancellation, error, and event boundaries before their own
