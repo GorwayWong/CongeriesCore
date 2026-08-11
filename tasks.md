@@ -31,7 +31,7 @@ follow-up work.
 | Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, authorized CheckpointStore, recovery, approval persistence, and Evaluation; Artifact storage and provider-wide storage contracts remain |
 | Context, Memory, Model, and direct Agent execution | Implemented | Authorized Context resolution, independent Memory operations, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
 | Workflow | In Progress | Minimal direct runtime with versioned contracts, DAG validation, AgentNode child Runs, durable output references, checkpoint recovery, ApprovalNode, EvaluationNode, and exact fixtures; remaining node catalog and engine adapters are deferred |
-| Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
+| Plugins, Tools, and MCP | In Progress | Plugin v1 manifest, deterministic dependencies, atomic registry, execution leases, authorized lifecycle, safe drain/unload, events, and fixtures implemented; Skill, Tool, and MCP execution remain |
 
 ### 1.3 Current Workflow Milestone
 
@@ -109,57 +109,34 @@ Evaluation milestone acceptance:
 - In-memory fakes demonstrate identical outcomes through replaceable evaluator
   implementations, and the full coverage, Ruff, and Pyright gates remain green.
 
-### 1.5 Next Recommended Milestone: Plugin SDK and Safe Unload
+### 1.5 Current Plugin Milestone and Next Recommendation
 
-Start **Task 5.1 Plugin SDK and Safe Unload** next. Evaluation closed the last
-standalone execution-harness gap, while Plugin lifecycle is the boundary needed
-before Skill, Tool, Provider, and MCP implementations can be loaded and removed
-safely. RFC-0002 is Accepted, but its v1 wire types, action catalog, event
-payloads, and persistence identities should be made exact before code begins.
+**Task 5.1 Plugin SDK and Safe Unload is implemented.** Delivered:
 
-Recommended delivery order:
+- Strict Plugin Manifest v1, pure validation, exact SemVer comparator ranges,
+  and JSON compatibility fixtures.
+- Permutation-independent dependency planning with distinct missing,
+  incompatible, ambiguous, and cyclic failures.
+- Immutable ownership-aware registry snapshots, generation-bound receipts,
+  atomic registration, and idempotent rollback and unregister.
+- Versioned lifecycle state, activation epochs, ACTIVE-only execution leases,
+  linearized drain admission, and lease cleanup on every terminal call outcome.
+- Authorized load, activate, drain, cancel-drain, and unload operations; Plugin
+  permission evaluation before activation; declared Action and Scope enforcement
+  on capability invocation.
+- Recoverable drain timeout and cancellation, unload-hook retry, repeated and
+  concurrent unload safety, reliable requested/failed audit events, and redacted
+  post-commit lifecycle observability.
+- Two fake loaders plus manifest, dependency, registry, lease, rollback, race,
+  unload, authorization, event, and exact fixture tests.
 
-1. Harden [RFC-0002](docs/rfcs/RFC-0002-plugin-sdk.md) with strict versioned
-   `PluginManifest`, capability declaration, lifecycle state, lease, transition,
-   error, action, event, idempotency, and compatibility contracts. Keep loader
-   technology and business capability outside Core.
-2. Implement frozen public models and a pure manifest validator. Reject malformed
-   versions, duplicate capabilities, unrepresentable permissions, and unknown
-   contract fields before loading an entrypoint.
-3. Add deterministic dependency resolution. Missing, incompatible, and cyclic
-   dependencies fail before registration and report structured errors.
-4. Add transactional capability registration. A collision or partial failure
-   rolls back every registration made for that plugin.
-5. Add an execution-lease manager. Leases are issued only in `ACTIVE`, are stable
-   for one invocation identity, and are released after success, failure, timeout,
-   or cancellation cleanup.
-6. Add drain and unload coordination. `DRAINING` rejects new leases, waits for
-   active leases, unregisters atomically, runs declared cleanup hooks once, and
-   preserves recoverable `DRAINING` or `UNREGISTERED` state on timeout or hook
-   failure.
-7. Route lifecycle access through authorization, propagate Scope/deadline/
-   cancellation/trace, and emit redacted lifecycle events. Audit-relevant failure
-   must use the existing reliable Event path.
-8. Add exact fixtures, two fake plugin loaders, concurrency/race tests, rollback
-   tests, drain recovery tests, and compatibility gates before marking RFC-0002
-   and Task 5.1 Implemented.
-
-Plugin milestone acceptance:
-
-- Invalid manifests and dependency graphs cause no load or registration effects.
-- Registration is all-or-nothing and conflicts use structured standard errors.
-- `DRAINING` admits no new lease while already leased work can finish normally.
-- Lease cleanup runs on success, failure, timeout, and cancellation without
-  disposing a resource still used by another invocation.
-- Repeated unload is safe; drain retry and explicit return to `ACTIVE` follow the
-  RFC state machine.
-- Events and errors contain plugin/capability references but no plugin-owned
-  secrets or implementation objects.
-- Exact fixtures, full pytest coverage, Ruff, and Pyright remain green.
-
-Defer Task 5.2 Skill and Tool execution, Task 5.3 MCP adapters, the remaining
-Workflow node catalog, parallel scheduling, external engines, and general
-StorageProvider work until this lifecycle boundary passes its standalone tests.
+Start **Task 5.2 Skill and Tool Registries** next, using this lifecycle boundary
+for registration and execution. Freeze the standalone Skill and Tool contracts
+and gateways before connecting Agent or Workflow execution; otherwise those
+runtimes would accidentally become the place where registry, authorization, and
+idempotency rules are defined. Defer Task 5.3 MCP adapters, remaining Workflow
+node execution, parallel scheduling, external engines, and general
+StorageProvider work until their owning milestones.
 
 ## 2. Phase 1: Architecture Baseline and Core Types
 
@@ -495,10 +472,11 @@ Acceptance:
 
 ### Task 5.1 Plugin SDK and Safe Unload
 
-Status: Not Started
+Status: Implemented in 0.2.0
 
-Implement manifest validation, dependency resolution, capability registration,
-active leases, drain, unregistration, unload, and lifecycle events.
+Delivered strict manifest validation, deterministic dependency resolution,
+atomic capability registration, ACTIVE execution leases, safe drain,
+unregistration, unload recovery, authorization, and lifecycle events.
 
 Failure scenarios:
 
@@ -521,11 +499,63 @@ Status: Not Started
 Implement discovery, versioned registration, progressive Skill loading, typed
 Tool schemas, authorization, execution policy, and idempotency declaration.
 
+Recommended delivery order:
+
+1. Write and accept the exact Skill and Tool v1 RFC contract. Define stable
+   references, contract versions, Skill resource descriptors, Tool input/output
+   `SchemaRef` values, permissions, execution policy, retry/deadline behavior,
+   side-effect classification, and idempotency requirements. Keep concrete
+   instructions, scripts, and business Tool behavior outside Core.
+2. Implement frozen public models, exact JSON serialization, and pure validators.
+   Reject unknown fields, unsupported versions, invalid resource paths, duplicate
+   references, inconsistent side-effect/idempotency declarations, and malformed
+   schemas before consulting a loader or registry.
+3. Add typed SkillRegistry and ToolRegistry facades over the Plugin capability
+   registry. Preserve its immutable snapshots, owner-bound generation receipts,
+   atomic visibility, deterministic lookup, and structured collision behavior;
+   do not create a second independent publication transaction.
+4. Add pure discovery plus loader protocols. Skill metadata is discoverable
+   without loading its instructions, examples, scripts, or references. A resource
+   request loads only named resources under explicit size, Scope, deadline, and
+   cancellation bounds.
+5. Add the authorized Tool execution gateway. Validate input before leasing,
+   authorize the declared Action and resource, narrow Scope, acquire the owning
+   Plugin lease, execute with deadline/cancellation control, validate output, and
+   release in `finally`. Side-effecting Tools require a stable idempotency key.
+6. Add the Skill resource gateway. Authorize each resource request, acquire the
+   owning Plugin lease for the full read, reject access during DRAINING, and
+   prevent unbounded or undeclared context injection.
+7. Add shared resolution and validation adapters for AgentSpec references and
+   future Workflow SkillNode/ToolNode consumers. Missing registrations,
+   incompatible contracts, undeclared permissions, invalid schemas, or a
+   side-effecting call without an idempotency identity must fail before execution.
+   Keep Workflow scheduling and node execution in Task 4.1.
+8. Add exact Skill/Tool/action/event fixtures and shared contract suites for two
+   fake loaders/executors. Cover lazy loading, authorization denial, schema
+   failure, duplicate side-effect retries, timeout/cancellation, acquire/drain
+   races, unload during use, rollback, and recovery before marking Task 5.2
+   Implemented.
+
+Failure scenarios:
+
+- Invalid or incompatible Skill/Tool contracts
+- Eager or undeclared Skill resource loading
+- Tool input/output schema mismatch
+- Permission, Scope, or execution-policy denial
+- Side-effecting Tool invocation without idempotency identity
+- Timeout, cancellation, retry, or Plugin drain racing with execution
+
 Acceptance:
 
 - Registry conflicts produce structured errors.
 - Skill resources load only when requested.
-- Tool calls cannot bypass Scope or RuntimeCallContext.
+- Tool calls cannot bypass Scope, RuntimeCallContext, authorization, schema
+  validation, Plugin leases, or declared execution policy.
+- Side-effecting retries preserve one stable operation identity and never silently
+  downgrade to at-most-once assumptions.
+- Agent reference resolution and future Workflow adapters resolve only registered
+  compatible references and never call loader implementations directly.
+- Exact fixtures, full pytest coverage, Ruff, and Pyright remain green.
 
 ### Task 5.3 MCP Adapter
 
@@ -598,8 +628,7 @@ Delivered:
 
 Remaining:
 
-- Plugin manifest and storage contract fixtures after those public schemas are
-  implemented
+- Storage contract fixtures after those public schemas are implemented
 - Migration fixtures and compatibility checks for future contract versions
 
 Add compatibility fixtures for public schemas, provider contracts, plugin

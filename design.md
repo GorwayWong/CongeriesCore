@@ -383,6 +383,12 @@ Execute is behavior while ACTIVE, not a lifecycle state. DRAINING rejects new
 work and waits for active leases. Unload is idempotent. A drain timeout leaves
 the plugin in DRAINING until drain is retried or explicitly cancelled.
 
+Pure Manifest validation is separated from environment preflight and lifecycle
+authorization. Dependency resolution consumes immutable catalog snapshots.
+Capability publication uses an ownership-aware registry transaction whose
+committed snapshot changes atomically. Lifecycle commands reuse
+RuntimeCallContext, AuthorizedDispatcher, and reliable redacted Runtime Events.
+
 See [RFC-0002](docs/rfcs/RFC-0002-plugin-sdk.md).
 
 ## 11. MCP and Application Integration

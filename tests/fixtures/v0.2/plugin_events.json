@@ -1,0 +1,5 @@
+[
+  "core.plugin.lifecycle_transition_requested",
+  "core.plugin.lifecycle_changed",
+  "core.plugin.lifecycle_failed"
+]

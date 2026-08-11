@@ -19,6 +19,7 @@ from congeries_core.evaluation import (
 )
 from congeries_core.event.model import CoreEventType
 from congeries_core.harness.agent import AgentSpec
+from congeries_core.plugin import ManifestValidator, plugin_actions
 from congeries_core.policy.authorization import ActionRef
 from congeries_core.provider import provider_actions
 from congeries_core.provider.context import ContextBinding
@@ -198,3 +199,28 @@ def test_evaluation_v02_fixtures_round_trip_exactly() -> None:
     assert _serialized([action.to_data() for action in actions]) == _text(
         "evaluation_actions.json"
     )
+
+
+def test_plugin_v1_manifest_action_and_event_fixtures_round_trip_exactly() -> None:
+    manifest = ManifestValidator().validate(_object("plugin_manifest.json"))
+    assert ManifestValidator().validate(manifest.to_data()) == manifest
+    assert _serialized(manifest.to_data()) == _text("plugin_manifest.json")
+
+    values = as_array(json.loads(_text("plugin_actions.json")), "Plugin actions")
+    actions = tuple(
+        ActionRef.from_data(as_object(item, "Plugin action")) for item in values
+    )
+    assert actions == plugin_actions()
+    assert _serialized([action.to_data() for action in actions]) == _text(
+        "plugin_actions.json"
+    )
+
+    event_values = cast(
+        list[str], as_array(json.loads(_text("plugin_events.json")), "Plugin events")
+    )
+    assert event_values == [
+        CoreEventType.PLUGIN_LIFECYCLE_TRANSITION_REQUESTED.value,
+        CoreEventType.PLUGIN_LIFECYCLE_CHANGED.value,
+        CoreEventType.PLUGIN_LIFECYCLE_FAILED.value,
+    ]
+    assert _serialized(event_values) == _text("plugin_events.json")

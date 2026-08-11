@@ -1,0 +1,27 @@
+[
+  {
+    "namespace": "core",
+    "name": "plugin.load",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "plugin.activate",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "plugin.drain",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "plugin.cancel_drain",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "plugin.unload",
+    "version": "1"
+  }
+]

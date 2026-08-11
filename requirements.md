@@ -174,6 +174,8 @@ Core shall support:
 - Rejection of new work while draining
 - Active execution leases that prevent premature disposal
 - Drain timeout with retry or explicit return to ACTIVE
+- Deterministic dependency plans and atomic registration visibility
+- Recoverable registration rollback and lifecycle-hook failure
 - Skill registry, MCP integration, and StorageProvider abstraction
 
 ## 9. Runtime Event Requirements

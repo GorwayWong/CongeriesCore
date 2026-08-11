@@ -190,6 +190,34 @@ def core_schema_registry() -> EventSchemaRegistry:
             "evidence_refs",
             "result_digest",
         ),
+        CoreEventType.PLUGIN_LIFECYCLE_TRANSITION_REQUESTED: (
+            "plugin_id",
+            "plugin_version",
+            "from_state",
+            "to_state",
+            "operation_id",
+            "active_lease_count",
+            "outcome",
+        ),
+        CoreEventType.PLUGIN_LIFECYCLE_CHANGED: (
+            "plugin_id",
+            "plugin_version",
+            "from_state",
+            "to_state",
+            "operation_id",
+            "active_lease_count",
+            "outcome",
+        ),
+        CoreEventType.PLUGIN_LIFECYCLE_FAILED: (
+            "plugin_id",
+            "plugin_version",
+            "from_state",
+            "to_state",
+            "operation_id",
+            "active_lease_count",
+            "outcome",
+            "error_code",
+        ),
     }
     for event_type in CoreEventType:
         registry.register(

@@ -1,0 +1,42 @@
+{
+  "contract_version": "1",
+  "name": "test.echo",
+  "version": "1.2.3",
+  "core_api": ">=0.2.0,<0.3.0",
+  "entrypoint": "test.echo:plugin",
+  "provides": [
+    {
+      "type": "tool",
+      "capability_id": "test.echo.capability",
+      "contract_version": "1.0.0",
+      "entry": "echo",
+      "permissions": [
+        {
+          "action": {
+            "namespace": "test",
+            "name": "echo.invoke",
+            "version": "1"
+          },
+          "scope_pattern": "core:workspace:*"
+        }
+      ]
+    }
+  ],
+  "requires": [],
+  "permissions": [
+    {
+      "action": {
+        "namespace": "test",
+        "name": "echo.invoke",
+        "version": "1"
+      },
+      "scope_pattern": "core:workspace:*"
+    }
+  ],
+  "lifecycle": [
+    "on_activate",
+    "on_drain",
+    "on_load",
+    "on_unload"
+  ]
+}

@@ -9,7 +9,7 @@ semantics and metadata requirements are defined in the
 | ID | Title | Status |
 | --- | --- | --- |
 | RFC-0001 | Reserved | Reserved |
-| [RFC-0002](RFC-0002-plugin-sdk.md) | Plugin SDK | Accepted |
+| [RFC-0002](RFC-0002-plugin-sdk.md) | Plugin SDK | Implemented |
 | [RFC-0003](RFC-0003-workflow.md) | Workflow | Accepted |
 | [RFC-0004](RFC-0004-execution-run-lifecycle.md) | Execution Run Lifecycle | Implemented |
 | [RFC-0005](RFC-0005-architecture-decision-records.md) | Legacy ADR Bundle | Withdrawn/Misclassified |

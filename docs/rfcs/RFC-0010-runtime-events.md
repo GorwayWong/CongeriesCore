@@ -109,8 +109,16 @@ Core event types include:
 - `core.evaluation.verdict_recorded`
 - `core.artifact.created`
 - `core.plugin.lifecycle_changed`
+- `core.plugin.lifecycle_transition_requested`
+- `core.plugin.lifecycle_failed`
 
 Plugins use namespaced business event types outside the Core catalog.
+
+Plugin lifecycle transition requests and failures are AUDIT and require
+acknowledgement. A lifecycle-changed event is OBSERVABILITY and is emitted only
+after the authoritative state record commits. Plugin lifecycle payloads are
+reference-only and exclude entrypoints, implementations, secrets, permission
+constraints, and exception text.
 
 ## 6. Redaction
 

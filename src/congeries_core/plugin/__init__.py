@@ -1,1 +1,111 @@
-"""Plugin SDK namespace reserved for Phase 5 implementation."""
+"""Versioned Plugin SDK, atomic registration, and safe unload."""
+
+from .dependency import (
+    CapabilityCatalogSnapshot,
+    CatalogCapability,
+    DependencyResolutionPlan,
+    DependencyResolver,
+    ResolvedDependency,
+)
+from .events import (
+    NullPluginEventPublisher,
+    PluginEventPublisher,
+    RuntimePluginEventPublisher,
+)
+from .lifecycle import (
+    ExecutionLease,
+    PluginLifecycleController,
+    PluginStateRecord,
+)
+from .loader import (
+    LoadedCapability,
+    PluginHooks,
+    PluginLoader,
+    PreparedPlugin,
+)
+from .manager import (
+    PLUGIN_ACTIVATE_ACTION,
+    PLUGIN_CANCEL_DRAIN_ACTION,
+    PLUGIN_DRAIN_ACTION,
+    PLUGIN_LOAD_ACTION,
+    PLUGIN_UNLOAD_ACTION,
+    PluginManager,
+    plugin_actions,
+)
+from .manifest import (
+    AllowRepresentablePermissions,
+    ManifestValidator,
+    PermissionRepresentationChecker,
+    PluginPreflight,
+)
+from .model import (
+    PLUGIN_MANIFEST_CONTRACT_VERSION,
+    CapabilityDeclaration,
+    CapabilityType,
+    DependencyKind,
+    PluginDependency,
+    PluginHookName,
+    PluginLifecycleState,
+    PluginManifest,
+    PluginPermission,
+    PluginRef,
+    SemVer,
+    VersionComparator,
+    VersionRange,
+)
+from .registry import (
+    CapabilityKey,
+    CapabilityRegistration,
+    CapabilityRegistrationPlan,
+    CapabilityRegistry,
+    CapabilityRegistrySnapshot,
+    RegistrationReceipt,
+)
+
+__all__ = [
+    "PLUGIN_ACTIVATE_ACTION",
+    "PLUGIN_CANCEL_DRAIN_ACTION",
+    "PLUGIN_DRAIN_ACTION",
+    "PLUGIN_LOAD_ACTION",
+    "PLUGIN_MANIFEST_CONTRACT_VERSION",
+    "PLUGIN_UNLOAD_ACTION",
+    "AllowRepresentablePermissions",
+    "CapabilityCatalogSnapshot",
+    "CapabilityDeclaration",
+    "CapabilityKey",
+    "CapabilityRegistration",
+    "CapabilityRegistrationPlan",
+    "CapabilityRegistry",
+    "CapabilityRegistrySnapshot",
+    "CapabilityType",
+    "CatalogCapability",
+    "DependencyKind",
+    "DependencyResolutionPlan",
+    "DependencyResolver",
+    "ExecutionLease",
+    "LoadedCapability",
+    "ManifestValidator",
+    "NullPluginEventPublisher",
+    "PermissionRepresentationChecker",
+    "PluginDependency",
+    "PluginEventPublisher",
+    "PluginHookName",
+    "PluginHooks",
+    "PluginLifecycleController",
+    "PluginLifecycleState",
+    "PluginLoader",
+    "PluginManager",
+    "PluginManifest",
+    "PluginPermission",
+    "PluginPreflight",
+    "PluginRef",
+    "PluginStateRecord",
+    "PreparedPlugin",
+    "RegistrationReceipt",
+    "ResolvedDependency",
+    "RuntimePluginEventPublisher",
+    "SemVer",
+    "VersionComparator",
+    "VersionRange",
+    "plugin_actions",
+]

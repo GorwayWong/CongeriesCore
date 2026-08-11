@@ -73,7 +73,9 @@ class CoreEventType(StrEnum):
     EVALUATION_STARTED = "core.evaluation.started"
     EVALUATION_VERDICT_RECORDED = "core.evaluation.verdict_recorded"
     ARTIFACT_CREATED = "core.artifact.created"
+    PLUGIN_LIFECYCLE_TRANSITION_REQUESTED = "core.plugin.lifecycle_transition_requested"
     PLUGIN_LIFECYCLE_CHANGED = "core.plugin.lifecycle_changed"
+    PLUGIN_LIFECYCLE_FAILED = "core.plugin.lifecycle_failed"
 
 
 @dataclass(frozen=True, slots=True)
