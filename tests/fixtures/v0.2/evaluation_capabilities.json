@@ -1,0 +1,23 @@
+{
+  "evaluator_id": "quality-1",
+  "contract_version": "1",
+  "request_versions": [
+    "1"
+  ],
+  "result_versions": [
+    "1"
+  ],
+  "input_schemas": [
+    {
+      "namespace": "test",
+      "name": "evaluation_input",
+      "version": "1"
+    }
+  ],
+  "profile_kinds": [
+    "external"
+  ],
+  "evidence_kinds": [
+    "evaluation_evidence"
+  ]
+}

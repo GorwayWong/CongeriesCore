@@ -116,20 +116,22 @@ The verified direct Agent slice includes:
 - Authorized Memory capability discovery, pagination, idempotent mutation,
   optional consolidation, cancellation cleanup, and redacted operation events
 - Stable v0.2 compatibility fixtures for Content, Context, Model, AgentSpec,
-  Memory, Checkpoint, approval, Workflow, Provider actions, and Core event
-  catalogs
+  Memory, Checkpoint, approval, Workflow, Evaluation, Provider actions, and Core
+  event catalogs
 - Authorized in-memory CheckpointStore, canonical integrity, marker commits,
   migration/fallback policy, minimal restoration, and approval persistence
 - Immutable Workflow contracts, strict DAG validation, deterministic
   one-at-a-time scheduling, AgentNode child Runs, authorized durable output
   references, Checkpoint recovery, and ApprovalNode suspension and resumption
+- Deterministic schema-policy-quality Evaluation, reliable verdict audit,
+  replaceable quality evaluators, and durable EvaluationNode success and failure
+  boundaries
 
 The following remain outside this implemented slice:
 
 - Model-driven Tool execution loops
-- Skill, Tool, Context, Evaluation, and custom Workflow node execution
+- Skill, Tool, Context, and custom Workflow node execution
 - Parallel scheduling and external Workflow engine adapters
-- Evaluation coordination
 - Plugin lifecycle and MCP capability adapters
 
 These future capability families must reuse the implemented authorization,
@@ -167,13 +169,34 @@ In plain language, Core can now run a small, durable checklist of Agent steps:
    durably recorded.
 
 This does not yet make Core a general-purpose workflow engine. It intentionally
-does not execute Skill, Tool, Context, Evaluation, or custom nodes, and it does
+does not execute Skill, Tool, Context, or custom nodes, and it does
 not provide parallel scheduling, compensation, or an external engine adapter.
 
-ApprovalNode composes the existing durable ApprovalCoordinator. Skill, Tool,
-Context, Evaluation, custom nodes, parallel scheduling, compensation, and
-external engine adapters remain deferred. The normative delivery sequence remains
-in [tasks.md](../tasks.md).
+### Evaluation in Plain Language
+
+Think of Evaluation as a three-question checkpoint for one value:
+
+1. Does the value match its declared schema?
+2. Does an independent content policy allow it?
+3. Does one selected, replaceable quality evaluator accept it?
+
+Core asks those questions in that order and stops on the first "no." It never
+lets a later evaluator turn an earlier failure into success. The quality profile
+and evidence bodies stay outside Core; Core carries only opaque profile names,
+safe measurements, and scoped evidence references.
+
+Before any result becomes recoverable, a required audit sink must acknowledge
+the verdict. Core then stores the typed `EvaluationResult` and commits a
+Checkpoint. A passed node may unlock its dependents. A denied, failed, timed-out,
+or cancelled node is also saved, but it terminates the Run and unlocks nothing.
+Recovery reads that saved result and does not call the evaluator again.
+
+ApprovalNode composes the durable ApprovalCoordinator. EvaluationNode composes
+this fail-fast Evaluation harness. Skill, Tool, Context, custom nodes, parallel
+scheduling, compensation, and external engine adapters remain deferred. The
+normative delivery sequence remains in [tasks.md](../tasks.md), and reviewers can
+use the [Evaluation Pipeline Code Review Guide](reviews/evaluation-pipeline-code-review.md)
+for a file-by-file walkthrough and verification checklist.
 
 ## Extension Flow
 
@@ -198,6 +221,7 @@ and infrastructure remain replaceable through adapters and providers.
 | ModelProvider | [RFC-0009](rfcs/RFC-0009-model-provider.md) |
 | Runtime Events | [RFC-0010](rfcs/RFC-0010-runtime-events.md) |
 | Checkpoint, commit, and recovery | [RFC-0011](rfcs/RFC-0011-checkpoint-recovery.md) |
+| Evaluation pipeline and node boundary | [RFC-0012](rfcs/RFC-0012-evaluation.md) |
 
 Cross-cutting rationale is indexed in the [ADR Registry](adrs/README.md), and
 implementation sequencing is defined in [tasks.md](../tasks.md).

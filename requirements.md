@@ -89,6 +89,19 @@ provide at-least-once node execution. Side-effecting nodes shall use idempotency
 keys. Graph-version mismatch shall reject recovery unless a migration is
 registered.
 
+### 5.5 Evaluation
+
+Evaluation shall apply schema validation, content policy evaluation, and one
+replaceable quality evaluator in that order. The first non-success verdict shall
+terminate evaluation. Content policy is distinct from access authorization, and
+Core shall not define business rubrics, scores, thresholds, or evidence storage.
+
+Evaluation verdicts shall be typed, auditable, and durable. A required audit
+acknowledgement shall precede every stable Evaluation node boundary. Successful
+and non-successful results shall be persisted by reference, but only a committed
+successful result may unlock downstream Workflow nodes. Recovery shall not
+redispatch a committed non-successful Evaluation node.
+
 ## 6. Capability Requirements
 
 ### 6.1 Agent
@@ -140,14 +153,16 @@ outcomes.
   plugin-defined.
 - AuthorizationPolicy shall evaluate principal, action, resource, and Scope.
 - Authorization shall deny access by default.
-- Approval, denied authorization, and cross-scope grants shall emit audit events.
+- Approval, Evaluation verdicts, denied authorization, and cross-scope grants
+  shall emit audit events.
 - Sensitive event and checkpoint data shall support redaction or reference-based
   storage.
 
 ## 8. Plugin and Extension Requirements
 
 Plugins may provide Workflows, Skills, Tools, ContextProviders,
-MemoryProviders, ModelProviders, StorageProviders, and MCP adapters.
+MemoryProviders, ModelProviders, QualityEvaluators, StorageProviders, and MCP
+adapters.
 
 Core shall support:
 

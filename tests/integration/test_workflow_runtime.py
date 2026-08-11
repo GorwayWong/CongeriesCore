@@ -10,15 +10,34 @@ from congeries_core.checkpoint import (
     ApprovalCoordinator,
     ApprovalDecision,
     ApprovalOutcome,
+    Checkpoint,
     CheckpointCoordinator,
     CheckpointGateway,
     CheckpointMigratorRegistry,
     CheckpointReference,
     CheckpointStoreRegistry,
     InMemoryCheckpointStore,
+    NodeOutcome,
     RecoveryCoordinator,
     RecoveryRequest,
     checkpoint_actions,
+)
+from congeries_core.evaluation import (
+    EVALUATION_RESULT_SCHEMA,
+    EvaluationHarness,
+    EvaluationPolicyGateway,
+    EvaluationPolicyRegistry,
+    EvaluationRequest,
+    EvaluationResult,
+    EvaluationResultSchemaValidator,
+    EvaluationStage,
+    EvaluationStageResult,
+    EvaluationVerdict,
+    QualityEvaluatorCapabilities,
+    QualityEvaluatorGateway,
+    QualityEvaluatorRegistry,
+    SchemaEvaluator,
+    evaluation_actions,
 )
 from congeries_core.policy.authorization import (
     ActionRegistry,
@@ -31,6 +50,7 @@ from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import CancellationToken, Deadline, TraceContext
 from congeries_core.runtime.errors import CoreError, ErrorCategory, core_error
 from congeries_core.runtime.ids import (
+    CheckpointRef,
     DefinitionId,
     NodeId,
     PrincipalId,
@@ -53,6 +73,8 @@ from congeries_core.workflow import (
     AgentNodeConfig,
     ApprovalNodeConfig,
     AuthorizedNodeOutputPersistence,
+    DeterministicScheduler,
+    EvaluationNodeConfig,
     ExecutionPolicy,
     LoadNodeOutputRequest,
     PersistNodeOutputRequest,
@@ -82,6 +104,69 @@ SCHEMA = SchemaRef("test", "workflow_value", "1")
 class AcceptValidator:
     def validate(self, value: JsonValue) -> None:
         del value
+
+
+@dataclass(slots=True)
+class WorkflowEvaluationPolicy:
+    verdict: EvaluationVerdict
+    calls: int = 0
+
+    async def evaluate(
+        self, request: EvaluationRequest, context: RuntimeCallContext
+    ) -> EvaluationStageResult:
+        del request, context
+        self.calls += 1
+        return EvaluationStageResult(
+            EvaluationStage.POLICY, self.verdict, "workflow_policy_result"
+        )
+
+
+@dataclass(slots=True)
+class WorkflowQualityEvaluator:
+    verdict: EvaluationVerdict
+    calls: int = 0
+
+    async def capabilities(
+        self, context: RuntimeCallContext
+    ) -> QualityEvaluatorCapabilities:
+        del context
+        return QualityEvaluatorCapabilities(
+            ProviderId("quality-1"),
+            "1",
+            ("1",),
+            ("1",),
+            (SCHEMA,),
+            ("external",),
+            ("evaluation_evidence",),
+        )
+
+    async def evaluate(
+        self, request: EvaluationRequest, context: RuntimeCallContext
+    ) -> EvaluationStageResult:
+        del request, context
+        self.calls += 1
+        return EvaluationStageResult(
+            EvaluationStage.QUALITY, self.verdict, "workflow_quality_result"
+        )
+
+
+@dataclass(slots=True)
+class WorkflowEvaluationEvents:
+    verdicts: list[EvaluationResult] = field(default_factory=list)
+
+    async def evaluation_started(
+        self, request: EvaluationRequest, context: RuntimeCallContext
+    ) -> None:
+        del request, context
+
+    async def evaluation_verdict_recorded(
+        self,
+        request: EvaluationRequest,
+        result: EvaluationResult,
+        context: RuntimeCallContext,
+    ) -> None:
+        del request, context
+        self.verdicts.append(result)
 
 
 @dataclass(slots=True)
@@ -144,6 +229,9 @@ class WorkflowHarness:
     checkpoint_store: InMemoryCheckpointStore
     events: EventRecorder
     restorer: Restorer
+    evaluation_policy: WorkflowEvaluationPolicy | None = None
+    quality_evaluator: WorkflowQualityEvaluator | None = None
+    evaluation_events: WorkflowEvaluationEvents | None = None
 
 
 def _node_scope(value: str) -> ScopeRef:
@@ -222,10 +310,62 @@ def _approval_node(value: str = "approval") -> WorkflowNode:
     )
 
 
+def _evaluation_node(value: str = "evaluation") -> WorkflowNode:
+    permissions = (
+        WorkflowPermission(
+            WORKFLOW_NODE_EXECUTE_ACTION,
+            ResourceRef("core", "workflow_node", ResourceId(value)),
+        ),
+        WorkflowPermission(
+            evaluation_actions()[0],
+            ResourceRef("core", "evaluation_policy", ResourceId("policy-1")),
+        ),
+        *(
+            WorkflowPermission(
+                action,
+                ResourceRef("core", "quality_evaluator", ResourceId("quality-1")),
+            )
+            for action in evaluation_actions()[1:]
+        ),
+    )
+    return WorkflowNode(
+        node_id=NodeId(value),
+        node_type=WorkflowNodeType.EVALUATION.value,
+        contract_version="1",
+        input_schema=SCHEMA,
+        input_bindings=(WorkflowInputBinding(WorkflowInputSource.WORKFLOW_INPUT),),
+        output_schema=EVALUATION_RESULT_SCHEMA,
+        scope=_node_scope(value),
+        permissions=permissions,
+        timeout_seconds=10,
+        retry_limit=0,
+        side_effecting=True,
+        idempotency_required=True,
+        checkpoint=True,
+        config=EvaluationNodeConfig(
+            "policy-1", ProviderId("quality-1"), "external:profile-1"
+        ),
+    )
+
+
 def _definition(
-    fixture: RuntimeFixture, *, approval: bool = False
+    fixture: RuntimeFixture, *, approval: bool = False, evaluation: bool = False
 ) -> WorkflowDefinition:
     first = _agent_node(fixture, "a", timeout_seconds=10)
+    if evaluation:
+        gate = _evaluation_node()
+        final = _agent_node(fixture, "b")
+        return WorkflowDefinition(
+            WorkflowId("workflow-1"),
+            DefinitionId("workflow-definition-1"),
+            "1",
+            SCHEMA,
+            (gate, final),
+            (WorkflowDependency(gate.node_id, final.node_id),),
+            SCHEMA,
+            WorkflowOutputBinding(final.node_id),
+            ExecutionPolicy(),
+        )
     if not approval:
         return WorkflowDefinition(
             WorkflowId("workflow-1"),
@@ -262,9 +402,12 @@ async def _harness(
     approval: bool = False,
     fail_after_first_write: bool = False,
     fail_node_id: NodeId | None = None,
+    evaluation_verdict: EvaluationVerdict | None = None,
 ) -> WorkflowHarness:
     agent = await runtime_fixture()
-    definition = _definition(agent, approval=approval)
+    definition = _definition(
+        agent, approval=approval, evaluation=evaluation_verdict is not None
+    )
     workflow_run = create_root_workflow_run(
         definition_id=definition.definition_id,
         workflow_id=definition.workflow_id,
@@ -277,8 +420,9 @@ async def _harness(
     created = await agent.runs.create(workflow_run)
     assert isinstance(created, WorkflowRun)
     clock = FixedClock()
+    actions = (*checkpoint_actions(), *workflow_actions(), *evaluation_actions())
     dispatcher = AuthorizedDispatcher(
-        action_registry=ActionRegistry((*checkpoint_actions(), *workflow_actions())),
+        action_registry=ActionRegistry(actions),
         audit_publisher=AuditRecorder(),
         audit_failure_handler=FailureRecorder(),
         clock=clock,
@@ -310,6 +454,49 @@ async def _harness(
     )
     schemas = SchemaRegistry()
     schemas.register(SCHEMA, AcceptValidator())
+    schemas.register(EVALUATION_RESULT_SCHEMA, EvaluationResultSchemaValidator())
+    evaluation_policy: WorkflowEvaluationPolicy | None = None
+    quality_evaluator: WorkflowQualityEvaluator | None = None
+    evaluation_events: WorkflowEvaluationEvents | None = None
+    evaluations: EvaluationHarness | None = None
+    if evaluation_verdict is not None:
+        policy_verdict = (
+            evaluation_verdict
+            if evaluation_verdict
+            in {
+                EvaluationVerdict.POLICY_DENIED,
+                EvaluationVerdict.POLICY_INDETERMINATE,
+            }
+            else EvaluationVerdict.PASSED
+        )
+        quality_verdict = (
+            evaluation_verdict
+            if evaluation_verdict
+            in {EvaluationVerdict.PASSED, EvaluationVerdict.QUALITY_FAILED}
+            else EvaluationVerdict.PASSED
+        )
+        evaluation_policy = WorkflowEvaluationPolicy(policy_verdict)
+        quality_evaluator = WorkflowQualityEvaluator(quality_verdict)
+        policies = EvaluationPolicyRegistry()
+        policies.register("policy-1", evaluation_policy)
+        evaluators = QualityEvaluatorRegistry()
+        evaluators.register(ProviderId("quality-1"), quality_evaluator)
+        evaluation_events = WorkflowEvaluationEvents()
+        evaluations = EvaluationHarness(
+            schema=SchemaEvaluator(schemas),
+            policy=EvaluationPolicyGateway(
+                policies=policies, dispatcher=dispatcher, clock=clock
+            ),
+            quality=QualityEvaluatorGateway(
+                evaluators=evaluators,
+                capabilities_dispatcher=dispatcher,
+                evaluate_dispatcher=dispatcher,
+                clock=clock,
+            ),
+            events=evaluation_events,
+            audit_failure_handler=FailureRecorder(),
+            clock=clock,
+        )
     output_store = RecordingOutputStore(
         fail_after_first_write=fail_after_first_write,
         fail_node_id=fail_node_id,
@@ -317,7 +504,7 @@ async def _harness(
     runtime = WorkflowRuntime(
         validator=WorkflowValidator(
             schemas=schemas,
-            actions=ActionRegistry((*checkpoint_actions(), *workflow_actions())),
+            actions=ActionRegistry(actions),
         ),
         runs=agent.runs,
         agents=agent.runtime,
@@ -332,6 +519,7 @@ async def _harness(
         recovery=recovery,
         approvals=approvals,
         clock=clock,
+        evaluations=evaluations,
     )
     call = RuntimeCallContext(
         run_id=workflow_run.run_id,
@@ -354,6 +542,9 @@ async def _harness(
         checkpoint_store,
         events,
         restorer,
+        evaluation_policy,
+        quality_evaluator,
+        evaluation_events,
     )
 
 
@@ -539,3 +730,224 @@ async def test_approval_waits_is_restart_safe_and_then_unlocks_downstream() -> N
         "approval.decided",
         "checkpoint.saved",
     ]
+
+
+@pytest.mark.asyncio
+async def test_evaluation_success_commits_before_unlocking_downstream() -> None:
+    harness = await _harness(evaluation_verdict=EvaluationVerdict.PASSED)
+    outcome = await harness.runtime.execute(harness.definition, harness.context)
+
+    assert outcome.result is not None
+    assert outcome.result.run.status is RunStatus.SUCCEEDED
+    assert [request.node_id.value for request in harness.output_store.requests] == [
+        "evaluation",
+        "b",
+    ]
+    assert harness.evaluation_policy is not None
+    assert harness.evaluation_policy.calls == 1
+    assert harness.quality_evaluator is not None
+    assert harness.quality_evaluator.calls == 1
+    assert len(harness.agent.model_provider.generate_calls) == 1
+    assert harness.evaluation_events is not None
+    assert harness.evaluation_events.verdicts[0].verdict is EvaluationVerdict.PASSED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("verdict", "node_outcome", "quality_calls"),
+    [
+        (EvaluationVerdict.POLICY_DENIED, NodeOutcome.DENIED, 0),
+        (EvaluationVerdict.POLICY_INDETERMINATE, NodeOutcome.DENIED, 0),
+        (EvaluationVerdict.QUALITY_FAILED, NodeOutcome.FAILED, 1),
+    ],
+)
+async def test_evaluation_failure_is_stable_and_never_unlocks_downstream(
+    verdict: EvaluationVerdict,
+    node_outcome: NodeOutcome,
+    quality_calls: int,
+) -> None:
+    harness = await _harness(evaluation_verdict=verdict)
+    outcome = await harness.runtime.execute(harness.definition, harness.context)
+
+    assert outcome.result is not None
+    assert outcome.result.run.status is RunStatus.FAILED
+    assert harness.agent.model_provider.generate_calls == []
+    assert [request.node_id.value for request in harness.output_store.requests] == [
+        "evaluation"
+    ]
+    assert harness.quality_evaluator is not None
+    assert harness.quality_evaluator.calls == quality_calls
+    marker = outcome.result.run.latest_checkpoint_ref
+    assert marker is not None
+    checkpoint = await harness.checkpoint_store.load(marker, harness.context.runtime)
+    state = next(
+        item for item in checkpoint.node_states if item.node_id.value == "evaluation"
+    )
+    assert state.outcome is node_outcome
+    assert state.output_ref is None
+    assert state.error_ref is not None
+    assert NodeId("b") in checkpoint.pending_nodes
+    assert "hello" not in json.dumps(checkpoint.to_data())
+
+
+@pytest.mark.asyncio
+async def test_recovery_terminalizes_stable_evaluation_failure_without_redispatch() -> (
+    None
+):
+    harness = await _harness(evaluation_verdict=EvaluationVerdict.QUALITY_FAILED)
+    original_fail = harness.agent.runs.fail
+
+    async def crash_before_terminal(*args: object) -> object:
+        del args
+        raise core_error(
+            ErrorCategory.UNAVAILABLE,
+            "terminal_transition_interrupted",
+            "simulated crash after stable failure checkpoint",
+        )
+
+    harness.agent.runs.fail = crash_before_terminal  # type: ignore[method-assign]
+    with pytest.raises(CoreError) as interrupted:
+        await harness.runtime.execute(harness.definition, harness.context)
+    assert interrupted.value.detail.code == "terminal_transition_interrupted"
+    harness.agent.runs.fail = original_fail  # type: ignore[method-assign]
+
+    running = await harness.agent.runs.get(harness.context.run_id)
+    assert isinstance(running, WorkflowRun)
+    assert running.status is RunStatus.RUNNING
+    assert running.latest_checkpoint_ref is not None
+    assert harness.quality_evaluator is not None
+    assert harness.quality_evaluator.calls == 1
+
+    outcome = await harness.runtime.recover(
+        harness.definition,
+        harness.context,
+        RecoveryRequest(
+            running.run_id,
+            running.state_version,
+            PROVIDER,
+            harness.definition.definition_id,
+            harness.definition.version,
+        ),
+    )
+
+    assert outcome.result is not None
+    assert outcome.result.run.status is RunStatus.FAILED
+    assert harness.quality_evaluator.calls == 1
+    assert harness.agent.model_provider.generate_calls == []
+
+
+@pytest.mark.asyncio
+async def test_evaluation_output_crash_replays_same_result_and_persistence_key() -> (
+    None
+):
+    harness = await _harness(
+        evaluation_verdict=EvaluationVerdict.PASSED,
+        fail_after_first_write=True,
+    )
+    with pytest.raises(CoreError) as interrupted:
+        await harness.runtime.execute(harness.definition, harness.context)
+    assert interrupted.value.detail.code == "output_write_interrupted"
+    running = await harness.agent.runs.get(harness.context.run_id)
+    assert isinstance(running, WorkflowRun)
+    assert running.latest_checkpoint_ref is not None
+    first_key = harness.output_store.requests[0].idempotency_key
+    assert harness.evaluation_events is not None
+    first_digest = harness.evaluation_events.verdicts[0].digest
+
+    outcome = await harness.runtime.recover(
+        harness.definition,
+        harness.context,
+        RecoveryRequest(
+            running.run_id,
+            running.state_version,
+            PROVIDER,
+            harness.definition.definition_id,
+            harness.definition.version,
+        ),
+    )
+
+    assert outcome.result is not None
+    assert outcome.result.run.status is RunStatus.SUCCEEDED
+    assert harness.output_store.requests[1].idempotency_key == first_key
+    assert harness.evaluation_events.verdicts[1].digest == first_digest
+    assert harness.evaluation_policy is not None
+    assert harness.evaluation_policy.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_evaluation_checkpoint_failure_never_unlocks_and_reuses_output_ref() -> (
+    None
+):
+    harness = await _harness(evaluation_verdict=EvaluationVerdict.PASSED)
+    original_save = harness.checkpoint_store.save
+    save_calls = 0
+
+    async def fail_second_save(
+        checkpoint: Checkpoint, context: RuntimeCallContext
+    ) -> CheckpointRef:
+        nonlocal save_calls
+        save_calls += 1
+        if save_calls == 2:
+            raise core_error(
+                ErrorCategory.UNAVAILABLE,
+                "checkpoint_write_interrupted",
+                "simulated checkpoint failure after result persistence",
+            )
+        return await original_save(checkpoint, context)
+
+    harness.checkpoint_store.save = fail_second_save  # type: ignore[method-assign]
+    with pytest.raises(CoreError) as interrupted:
+        await harness.runtime.execute(harness.definition, harness.context)
+    assert interrupted.value.detail.code == "checkpoint_write_interrupted"
+    assert harness.agent.model_provider.generate_calls == []
+    first_key = harness.output_store.requests[0].idempotency_key
+    first_reference = harness.output_store.references[first_key.value]
+    harness.checkpoint_store.save = original_save  # type: ignore[method-assign]
+
+    outcome = await harness.runtime.execute(harness.definition, harness.context)
+    assert outcome.result is not None
+    assert outcome.result.run.status is RunStatus.SUCCEEDED
+    assert harness.output_store.requests[1].idempotency_key == first_key
+    assert harness.output_store.references[first_key.value] == first_reference
+
+
+@pytest.mark.asyncio
+async def test_recovery_skips_evaluation_after_checkpoint_before_mark_crash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    harness = await _harness(evaluation_verdict=EvaluationVerdict.PASSED)
+    original_mark = DeterministicScheduler.mark_completed
+
+    def crash_before_mark(scheduler: DeterministicScheduler, node_id: NodeId) -> None:
+        if node_id == NodeId("evaluation"):
+            raise core_error(
+                ErrorCategory.UNAVAILABLE,
+                "scheduler_mark_interrupted",
+                "simulated crash after stable Evaluation checkpoint",
+            )
+        original_mark(scheduler, node_id)
+
+    monkeypatch.setattr(DeterministicScheduler, "mark_completed", crash_before_mark)
+    with pytest.raises(CoreError) as interrupted:
+        await harness.runtime.execute(harness.definition, harness.context)
+    assert interrupted.value.detail.code == "scheduler_mark_interrupted"
+    running = await harness.agent.runs.get(harness.context.run_id)
+    assert isinstance(running, WorkflowRun)
+    assert running.latest_checkpoint_ref is not None
+    assert harness.evaluation_policy is not None
+    assert harness.evaluation_policy.calls == 1
+
+    outcome = await harness.runtime.recover(
+        harness.definition,
+        harness.context,
+        RecoveryRequest(
+            running.run_id,
+            running.state_version,
+            PROVIDER,
+            harness.definition.definition_id,
+            harness.definition.version,
+        ),
+    )
+    assert outcome.result is not None
+    assert outcome.result.run.status is RunStatus.SUCCEEDED
+    assert harness.evaluation_policy.calls == 1

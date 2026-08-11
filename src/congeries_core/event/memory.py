@@ -70,6 +70,8 @@ class InMemoryEventLedger:
             key = event_id, sink_id
             pending = self._pending.get(key)
             if pending is None:
+                if key in self._acknowledged:
+                    return
                 raise core_error(
                     ErrorCategory.INVALID_REQUEST,
                     "outbox_entry_not_found",

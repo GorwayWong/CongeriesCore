@@ -171,6 +171,25 @@ def core_schema_registry() -> EventSchemaRegistry:
             "actor",
             "outcome",
         ),
+        CoreEventType.EVALUATION_STARTED: (
+            "evaluation_id",
+            "schema_ref",
+            "policy_ref",
+            "evaluator_id",
+            "profile_ref",
+        ),
+        CoreEventType.EVALUATION_VERDICT_RECORDED: (
+            "evaluation_id",
+            "schema_ref",
+            "evaluator_id",
+            "profile_ref",
+            "verdict",
+            "terminal_stage",
+            "reason_code",
+            "error_code",
+            "evidence_refs",
+            "result_digest",
+        ),
     }
     for event_type in CoreEventType:
         registry.register(

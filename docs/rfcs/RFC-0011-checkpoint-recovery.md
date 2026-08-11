@@ -7,7 +7,7 @@
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
 - Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0008](../adrs/ADR-0008-at-least-once-recovery.md), [RFC-0003](RFC-0003-workflow.md), [RFC-0004](RFC-0004-execution-run-lifecycle.md)
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0008](../adrs/ADR-0008-at-least-once-recovery.md), [RFC-0003](RFC-0003-workflow.md), [RFC-0004](RFC-0004-execution-run-lifecycle.md), [RFC-0012](RFC-0012-evaluation.md)
 - Supersedes: None
 
 ## 1. Scope

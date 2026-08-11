@@ -103,8 +103,10 @@ pre-execution DAG validation, deterministic one-at-a-time dependency scheduling,
 AgentNode child Runs, authorized durable node-output references, checkpoint-based
 recovery, and ApprovalNode coordination. Checkpoint, Run marker, restoration,
 migration, fallback, and approval services remain independently replaceable.
-Skill, Tool, Context, Evaluation, custom node execution, parallel scheduling, and
-external engine adapters remain deferred; their delivery order is owned by
+EvaluationNode composes the provider-neutral Evaluation harness and persists
+both successful and non-successful boundaries. Skill, Tool, Context, custom node
+execution, parallel scheduling, and external engine adapters remain deferred;
+their delivery order is owned by
 [tasks.md](tasks.md).
 
 ## 4. Run, Session, and Workspace
@@ -251,17 +253,40 @@ audit event, and resumes only after an authorized, correlated decision is
 durably captured by a second checkpoint and audit event. Approval state belongs
 to checkpoints rather than Runtime Event replay.
 
-Evaluation performs schema validation, policy checks, and quality evaluation.
-Evaluation cannot silently convert a failed or denied result into success.
-Approval coordination is implemented in the v0.2 direct Workflow runtime;
-Evaluation coordination and EvaluationNode execution remain the next harness
-gap. Their public contract must stay provider-neutral and must reuse Scope,
-RuntimeCallContext, authorization, audit, and Checkpoint boundaries.
+Evaluation composes pure schema validation, an independent content-policy
+boundary, and one replaceable quality evaluator in a fixed fail-fast sequence.
+It cannot silently convert a failed or denied result into success. A reliable
+verdict audit acknowledgement precedes durable result persistence and a stable
+Checkpoint. Both successful and non-successful Evaluation nodes are durable;
+only successful nodes unlock dependents. The provider-neutral public contract
+reuses Scope, RuntimeCallContext, access authorization, Runtime Events, and
+Checkpoint recovery as specified by
+[RFC-0012](docs/rfcs/RFC-0012-evaluation.md).
+
+The reference runtime makes the effect order visible:
+
+```text
+input
+  -> pure SchemaEvaluator
+  -> authorized EvaluationPolicyGateway
+  -> authorized QualityEvaluatorGateway
+  -> required verdict AUDIT acknowledgement
+  -> durable EvaluationResult reference
+  -> Checkpoint compare-and-swap
+  -> mark completed only when verdict == passed
+```
+
+Every non-success arrow stops before the next evaluator. After the audit gate,
+the runtime persists that non-success result through `error_ref`, commits the
+stable node outcome, and terminalizes the Run without marking the node complete.
+The detailed review path is documented in the
+[Evaluation Pipeline Code Review Guide](docs/reviews/evaluation-pipeline-code-review.md).
 
 ## 7. Provider Layer
 
 Core defines replaceable ContextProvider, MemoryProvider, ModelProvider,
-StorageProvider, CheckpointStore, AuthorizationPolicy, and EventSink contracts.
+QualityEvaluator, StorageProvider, CheckpointStore, AuthorizationPolicy,
+EvaluationPolicy, and EventSink contracts.
 
 ModelProvider supports vendor-neutral generation, streaming, capability
 discovery, usage, deadline, cancellation, structured output, and structured

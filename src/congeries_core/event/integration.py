@@ -9,6 +9,7 @@ from congeries_core.checkpoint.model import (
     ApprovalRequest,
     Checkpoint,
 )
+from congeries_core.evaluation.model import EvaluationRequest, EvaluationResult
 from congeries_core.policy.authorization import (
     AccessRequest,
     CorePrincipalKind,
@@ -19,8 +20,8 @@ from congeries_core.policy.authorization import (
 from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import CancellationToken, TraceContext
 from congeries_core.runtime.errors import ErrorDetail
-from congeries_core.runtime.ids import CheckpointRef, PrincipalId
-from congeries_core.runtime.json_types import JsonValue
+from congeries_core.runtime.ids import CheckpointRef, EventId, PrincipalId
+from congeries_core.runtime.json_types import JsonValue, as_json_value
 from congeries_core.runtime.run import RunTransition, WorkflowRun
 from congeries_core.state.service import RunEventPublisher
 
@@ -95,6 +96,73 @@ class RuntimeEventPublisher(RunEventPublisher):
             CorePrincipalKind.RUN, PrincipalId(context.run_id.value)
         )
         await self._dispatcher.publish(event, context, principal)
+
+    async def evaluation_started(
+        self, request: EvaluationRequest, context: RuntimeCallContext
+    ) -> None:
+        event = await self._dispatcher.create_event(
+            event_type=CoreEventType.EVALUATION_STARTED.value,
+            schema_version="1",
+            run_id=context.run_id,
+            root_run_id=context.root_run_id,
+            parent_run_id=context.parent_run_id,
+            scope=request.scope,
+            context=context,
+            sensitivity=Sensitivity.INTERNAL,
+            delivery_class=DeliveryClass.OBSERVABILITY,
+            payload={
+                "evaluation_id": PayloadField(request.evaluation_id.value),
+                "schema_ref": PayloadField("/".join(request.input_schema.key)),
+                "policy_ref": PayloadField(request.policy_ref),
+                "evaluator_id": PayloadField(request.quality_evaluator_id.value),
+                "profile_ref": PayloadField(request.quality_profile_ref),
+            },
+        )
+        await self._dispatcher.publish(event, context, _run_principal(context))
+
+    async def evaluation_verdict_recorded(
+        self,
+        request: EvaluationRequest,
+        result: EvaluationResult,
+        context: RuntimeCallContext,
+    ) -> None:
+        terminal = result.stage_results[-1]
+        # This payload is intentionally reference-only.  Do not add request.value,
+        # measurements, evidence bodies, or constraint values here: AUDIT sinks
+        # need the decision and proof identity, not the evaluated content.
+        event = await self._dispatcher.create_event(
+            event_type=CoreEventType.EVALUATION_VERDICT_RECORDED.value,
+            schema_version="1",
+            run_id=context.run_id,
+            root_run_id=context.root_run_id,
+            parent_run_id=context.parent_run_id,
+            scope=request.scope,
+            context=context,
+            sensitivity=Sensitivity.INTERNAL,
+            delivery_class=DeliveryClass.AUDIT,
+            payload={
+                "evaluation_id": PayloadField(request.evaluation_id.value),
+                "schema_ref": PayloadField("/".join(request.input_schema.key)),
+                "evaluator_id": PayloadField(request.quality_evaluator_id.value),
+                "profile_ref": PayloadField(request.quality_profile_ref),
+                "verdict": PayloadField(result.verdict.value),
+                "terminal_stage": PayloadField(result.terminal_stage.value),
+                "reason_code": PayloadField(terminal.reason_code),
+                "error_code": PayloadField(result.error.code if result.error else None),
+                "evidence_refs": PayloadField(
+                    as_json_value(
+                        [reference.to_data() for reference in result.evidence_refs],
+                        "Evaluation evidence references",
+                    )
+                ),
+                "result_digest": PayloadField(result.digest),
+            },
+            # The result digest includes evaluation identity and every normalized
+            # stage.  Replay therefore reaches the same outbox identity without
+            # relying on a newly allocated event sequence or timestamp.
+            event_id=EventId(f"evaluation-verdict:{result.digest}"),
+        )
+        await self._dispatcher.publish(event, context, _run_principal(context))
 
     async def authorization_denied(
         self, request: AccessRequest, decision: PolicyDecision
@@ -265,3 +333,9 @@ class RuntimeEventPublisher(RunEventPublisher):
             CorePrincipalKind.RUN, PrincipalId(context.run_id.value)
         )
         await self._dispatcher.publish(event, context, actor)
+
+
+def _run_principal(context: RuntimeCallContext) -> RuntimePrincipal:
+    return RuntimePrincipal.core(
+        CorePrincipalKind.RUN, PrincipalId(context.run_id.value)
+    )

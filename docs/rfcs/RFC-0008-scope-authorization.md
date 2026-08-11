@@ -7,7 +7,7 @@
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
 - Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md)
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md), [RFC-0012](RFC-0012-evaluation.md)
 - Supersedes: Security and isolation portions of the legacy RFC-0006 draft
 
 ## 1. Scope

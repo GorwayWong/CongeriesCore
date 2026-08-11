@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
+from congeries_core.evaluation import EVALUATION_RESULT_SCHEMA, evaluation_actions
 from congeries_core.policy.authorization import ActionRef, ActionRegistry, ResourceRef
 from congeries_core.runtime.errors import CoreError
 from congeries_core.runtime.ids import (
@@ -11,6 +12,7 @@ from congeries_core.runtime.ids import (
     DefinitionId,
     ModelBindingRef,
     NodeId,
+    ProviderId,
     ResourceId,
     WorkflowId,
 )
@@ -19,6 +21,7 @@ from congeries_core.workflow import (
     WORKFLOW_NODE_EXECUTE_ACTION,
     AgentNodeConfig,
     DeterministicScheduler,
+    EvaluationNodeConfig,
     ExecutionPolicy,
     UnsupportedNodeConfig,
     WorkflowDefinition,
@@ -77,6 +80,41 @@ def _agent_node(
             AgentId(f"agent-{value}"),
             DefinitionId(f"agent-definition-{value}"),
             ModelBindingRef("model-1"),
+        ),
+    )
+
+
+def _evaluation_node() -> WorkflowNode:
+    permissions = (
+        _permission(),
+        WorkflowPermission(
+            evaluation_actions()[0],
+            ResourceRef("core", "evaluation_policy", ResourceId("policy-1")),
+        ),
+        *(
+            WorkflowPermission(
+                action,
+                ResourceRef("core", "quality_evaluator", ResourceId("quality-1")),
+            )
+            for action in evaluation_actions()[1:]
+        ),
+    )
+    return WorkflowNode(
+        node_id=NodeId("evaluate"),
+        node_type=WorkflowNodeType.EVALUATION.value,
+        contract_version="1",
+        input_schema=SCHEMA,
+        input_bindings=(WorkflowInputBinding(WorkflowInputSource.WORKFLOW_INPUT),),
+        output_schema=EVALUATION_RESULT_SCHEMA,
+        scope=child_scope(),
+        permissions=permissions,
+        timeout_seconds=30,
+        retry_limit=0,
+        side_effecting=True,
+        idempotency_required=True,
+        checkpoint=True,
+        config=EvaluationNodeConfig(
+            "policy-1", ProviderId("quality-1"), "external:profile-1"
         ),
     )
 
@@ -270,3 +308,59 @@ def test_scheduler_is_sorted_and_never_releases_unmet_dependencies() -> None:
     scheduler.mark_completed(NodeId("d"))
     assert scheduler.done
     assert scheduler.pending_nodes() == ()
+
+
+def test_evaluation_node_round_trips_and_requires_fixed_contract() -> None:
+    node = _evaluation_node()
+    definition = replace(
+        _definition(nodes=(node,)),
+        output_schema=EVALUATION_RESULT_SCHEMA,
+        output_binding=WorkflowOutputBinding(node.node_id),
+    )
+    actions = (*workflow_actions(), *evaluation_actions())
+    validated = _validator(
+        schemas=(SCHEMA, EVALUATION_RESULT_SCHEMA), actions=actions
+    ).validate(definition)
+    assert WorkflowDefinition.from_data(definition.to_data()) == definition
+    assert validated.definition.nodes[0].config == node.config
+
+    for changed, code in (
+        (
+            replace(node, output_schema=SCHEMA),
+            "workflow_evaluation_contract_incomplete",
+        ),
+        (
+            replace(node, side_effecting=False, idempotency_required=False),
+            "workflow_evaluation_idempotency_required",
+        ),
+        (
+            replace(node, permissions=(_permission(),)),
+            "workflow_evaluation_permission_missing",
+        ),
+        (
+            replace(
+                node,
+                permissions=(
+                    node.permissions[0],
+                    replace(
+                        node.permissions[1],
+                        resource=ResourceRef(
+                            "core", "evaluation_policy", ResourceId("wrong")
+                        ),
+                    ),
+                    *node.permissions[2:],
+                ),
+            ),
+            "workflow_evaluation_permission_resource_invalid",
+        ),
+    ):
+        invalid = replace(
+            definition,
+            nodes=(changed,),
+            output_schema=changed.output_schema or EVALUATION_RESULT_SCHEMA,
+        )
+        with pytest.raises(CoreError) as error:
+            _validator(
+                schemas=(SCHEMA, EVALUATION_RESULT_SCHEMA), actions=actions
+            ).validate(invalid)
+        assert error.value.detail.code == code

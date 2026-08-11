@@ -61,6 +61,10 @@ class ApprovalId(Identifier):
     """Workflow approval identity."""
 
 
+class EvaluationId(Identifier):
+    """Stable Evaluation request identity."""
+
+
 class ModelBindingRef(Identifier):
     """Registered model binding reference."""
 

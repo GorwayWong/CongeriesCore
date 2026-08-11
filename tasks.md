@@ -28,9 +28,9 @@ follow-up work.
 | Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repository, Session lifecycle, and Workspace versioning |
 | Scope and Authorization | Implemented | Generic Scope model, default-deny AuthorizedDispatcher, audit integration, and non-bypass Context, Memory, Model, and EventSink paths |
 | Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
-| Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, authorized CheckpointStore, recovery and approval persistence; evaluation, Artifact storage, and provider-wide storage contracts remain |
+| Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, authorized CheckpointStore, recovery, approval persistence, and Evaluation; Artifact storage and provider-wide storage contracts remain |
 | Context, Memory, Model, and direct Agent execution | Implemented | Authorized Context resolution, independent Memory operations, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
-| Workflow | In Progress | Minimal direct runtime with versioned contracts, DAG validation, AgentNode child Runs, durable output references, checkpoint recovery, ApprovalNode, and exact fixtures; remaining node catalog and engine adapters are deferred |
+| Workflow | In Progress | Minimal direct runtime with versioned contracts, DAG validation, AgentNode child Runs, durable output references, checkpoint recovery, ApprovalNode, EvaluationNode, and exact fixtures; remaining node catalog and engine adapters are deferred |
 | Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
 
 ### 1.3 Current Workflow Milestone
@@ -54,23 +54,23 @@ deliberately narrow Task 4.1 slice and followed this dependency order:
 6. Add ApprovalNode next by composing the implemented ApprovalCoordinator.
 
 SkillNode, ToolNode, ContextNode, EvaluationNode, custom node extensions, and
-external Workflow engine adapters remain outside this first slice. Unsupported
-node types are rejected during validation rather than skipped at runtime.
+external Workflow engine adapters were outside this first slice. EvaluationNode
+was delivered afterward by Task 4.3. The other node types remain deferred, and
+unsupported contracts are rejected during validation rather than skipped at
+runtime.
 
 Task 6.3 now includes exact Workflow fixtures for the delivered public schemas.
 
 Tool and MCP tasks must register their actions and reuse the implemented
 AuthorizedDispatcher boundary before they may be marked Implemented.
 
-### 1.4 Next Recommended Milestone
+### 1.4 Completed Evaluation Milestone
 
-The next milestone should close the remaining **Task 4.3 Evaluation pipeline**
-before starting Plugin, Tool, MCP, general storage, or external Workflow engine
-work. This is the smallest unfinished control-plane slice and builds directly on
-the implemented SchemaRegistry, AuthorizedDispatcher, RuntimeCallContext,
-Runtime Events, durable output references, and Checkpoint recovery.
+The **Task 4.3 Evaluation pipeline** is implemented on top of SchemaRegistry,
+AuthorizedDispatcher, RuntimeCallContext, Runtime Events, durable output
+references, and Checkpoint recovery.
 
-Recommended delivery order:
+Completed delivery order:
 
 1. Freeze the Evaluation contract in an owning RFC before implementation. Define
    versioned request, typed verdict/result, evidence references, evaluator
@@ -109,14 +109,57 @@ Evaluation milestone acceptance:
 - In-memory fakes demonstrate identical outcomes through replaceable evaluator
   implementations, and the full coverage, Ruff, and Pyright gates remain green.
 
-Deferred until this milestone passes:
+### 1.5 Next Recommended Milestone: Plugin SDK and Safe Unload
 
-- Plugin SDK lifecycle and safe unload
-- Skill and Tool registries and execution loops
-- MCP adapters
-- Remaining Workflow node types, custom registration, parallel scheduling,
-  compensation, and external engine adapters
-- General Artifact, Workspace, and StorageProvider contracts
+Start **Task 5.1 Plugin SDK and Safe Unload** next. Evaluation closed the last
+standalone execution-harness gap, while Plugin lifecycle is the boundary needed
+before Skill, Tool, Provider, and MCP implementations can be loaded and removed
+safely. RFC-0002 is Accepted, but its v1 wire types, action catalog, event
+payloads, and persistence identities should be made exact before code begins.
+
+Recommended delivery order:
+
+1. Harden [RFC-0002](docs/rfcs/RFC-0002-plugin-sdk.md) with strict versioned
+   `PluginManifest`, capability declaration, lifecycle state, lease, transition,
+   error, action, event, idempotency, and compatibility contracts. Keep loader
+   technology and business capability outside Core.
+2. Implement frozen public models and a pure manifest validator. Reject malformed
+   versions, duplicate capabilities, unrepresentable permissions, and unknown
+   contract fields before loading an entrypoint.
+3. Add deterministic dependency resolution. Missing, incompatible, and cyclic
+   dependencies fail before registration and report structured errors.
+4. Add transactional capability registration. A collision or partial failure
+   rolls back every registration made for that plugin.
+5. Add an execution-lease manager. Leases are issued only in `ACTIVE`, are stable
+   for one invocation identity, and are released after success, failure, timeout,
+   or cancellation cleanup.
+6. Add drain and unload coordination. `DRAINING` rejects new leases, waits for
+   active leases, unregisters atomically, runs declared cleanup hooks once, and
+   preserves recoverable `DRAINING` or `UNREGISTERED` state on timeout or hook
+   failure.
+7. Route lifecycle access through authorization, propagate Scope/deadline/
+   cancellation/trace, and emit redacted lifecycle events. Audit-relevant failure
+   must use the existing reliable Event path.
+8. Add exact fixtures, two fake plugin loaders, concurrency/race tests, rollback
+   tests, drain recovery tests, and compatibility gates before marking RFC-0002
+   and Task 5.1 Implemented.
+
+Plugin milestone acceptance:
+
+- Invalid manifests and dependency graphs cause no load or registration effects.
+- Registration is all-or-nothing and conflicts use structured standard errors.
+- `DRAINING` admits no new lease while already leased work can finish normally.
+- Lease cleanup runs on success, failure, timeout, and cancellation without
+  disposing a resource still used by another invocation.
+- Repeated unload is safe; drain retry and explicit return to `ACTIVE` follow the
+  RFC state machine.
+- Events and errors contain plugin/capability references but no plugin-owned
+  secrets or implementation objects.
+- Exact fixtures, full pytest coverage, Ruff, and Pyright remain green.
+
+Defer Task 5.2 Skill and Tool execution, Task 5.3 MCP adapters, the remaining
+Workflow node catalog, parallel scheduling, external engines, and general
+StorageProvider work until this lifecycle boundary passes its standalone tests.
 
 ## 2. Phase 1: Architecture Baseline and Core Types
 
@@ -361,9 +404,9 @@ Delivered in the first slice:
 - ApprovalNode waiting, restart reconstruction, authorized decisions, and
   downstream resumption through the existing ApprovalCoordinator
 
-Deferred from the first slice:
+Still deferred after the Evaluation delivery:
 
-- SkillNode, ToolNode, ContextNode, and EvaluationNode execution
+- SkillNode, ToolNode, and ContextNode execution
 - Custom node registration and capability discovery
 - External Workflow engine adapters and distributed scheduling
 
@@ -415,7 +458,7 @@ Acceptance:
 
 ### Task 4.3 Execution, Approval, and Evaluation Harnesses
 
-Status: In Progress
+Status: Implemented in 0.2.0
 
 Delivered:
 
@@ -429,13 +472,17 @@ Delivered:
 - Authorized approval request/decision coordination with durable pre- and
   post-decision checkpoints
 - Checkpoint-based recovery coordination and attempt source tracking
-
-Remaining:
-
-- Schema, policy, and quality evaluation pipelines
-
-Implement pause, resume, cancellation, retry, recovery, approval decisions,
-schema validation, policy checking, and quality evaluation.
+- Versioned Evaluation request, stage result, verdict, result, capabilities,
+  evidence reference, error, action, and fixed output-schema contracts
+- Pure schema evaluation followed by an independent authorized EvaluationPolicy
+  and one replaceable QualityEvaluator with deterministic fail-fast composition
+- Reliable redacted verdict AUDIT acknowledgement before result persistence and
+  stable successful or non-successful EvaluationNode Checkpoints
+- Recovery that skips committed successful evaluations and terminalizes from a
+  committed non-success result without evaluator redispatch
+- Exact compatibility fixtures plus schema, policy, quality, timeout,
+  cancellation, audit, idempotency, persistence-crash, Checkpoint-crash, and
+  Workflow dependency-gate coverage
 
 Acceptance:
 
@@ -545,8 +592,8 @@ Status: In Progress
 Delivered:
 
 - Stable v0.2 JSON fixtures for Content, ContextBinding, ModelBinding, AgentSpec,
-  Memory, Checkpoint, approval, and Workflow contracts, plus Provider, Checkpoint,
-  and Workflow action catalogs and the Core event catalog
+  Memory, Checkpoint, approval, Workflow, and Evaluation contracts, plus Provider,
+  Checkpoint, Workflow, and Evaluation action catalogs and the Core event catalog
 - Exact deserialize, equality, and reserialize checks for delivered fixtures
 
 Remaining:

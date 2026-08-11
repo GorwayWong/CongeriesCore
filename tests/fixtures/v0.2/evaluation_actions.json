@@ -1,0 +1,17 @@
+[
+  {
+    "namespace": "core",
+    "name": "evaluation.policy.evaluate",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "evaluation.quality.capabilities",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "evaluation.quality.evaluate",
+    "version": "1"
+  }
+]

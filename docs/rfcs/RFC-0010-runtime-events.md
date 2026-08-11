@@ -7,7 +7,7 @@
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
 - Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0003](../adrs/ADR-0003-runtime-events-not-event-sourcing.md), [RFC-0008](RFC-0008-scope-authorization.md)
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0003](../adrs/ADR-0003-runtime-events-not-event-sourcing.md), [RFC-0008](RFC-0008-scope-authorization.md), [RFC-0012](RFC-0012-evaluation.md)
 - Supersedes: None
 
 ## 1. Scope
@@ -75,9 +75,9 @@ A failed stale transition emits no RunStateChanged event.
 `core.checkpoint.saved` is OBSERVABILITY and is allocated only after the Store
 save and Run marker compare-and-set both commit. `core.checkpoint.failed` is
 OBSERVABILITY and never represents a committed marker. Approval request and
-decision, checkpoint migration authorization, and corrupt-checkpoint fallback
-authorization are AUDIT and must be acknowledged before their protected state
-transition continues.
+decision, Evaluation verdict, checkpoint migration authorization, and
+corrupt-checkpoint fallback authorization are AUDIT and must be acknowledged
+before their protected state transition continues.
 
 ## 5. Event Catalog
 
@@ -105,6 +105,8 @@ Core event types include:
 - `core.checkpoint.failed`
 - `core.checkpoint.migration_authorized`
 - `core.checkpoint.fallback_authorized`
+- `core.evaluation.started`
+- `core.evaluation.verdict_recorded`
 - `core.artifact.created`
 - `core.plugin.lifecycle_changed`
 
@@ -145,6 +147,10 @@ unavailable, timeout, cancelled, redaction failure, and acknowledgement conflict
 
 Duplicate acknowledgement is success for the same event identity. An
 acknowledgement for a different payload under the same identity is conflict.
+The acknowledgement digest covers the stable logical envelope and classified
+payload while excluding delivery-time sequence and occurrence timestamp, so an
+at-least-once replay reconstructed after restart retains the same logical
+identity without weakening payload-conflict detection.
 
 ## 10. Conformance
 

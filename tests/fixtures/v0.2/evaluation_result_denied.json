@@ -1,0 +1,24 @@
+{
+  "contract_version": "1",
+  "evaluation_id": "evaluation-fixture",
+  "verdict": "policy_denied",
+  "stage_results": [
+    {
+      "stage": "schema",
+      "verdict": "passed",
+      "reason_code": "schema_valid",
+      "measurements": {},
+      "evidence_refs": []
+    },
+    {
+      "stage": "policy",
+      "verdict": "policy_denied",
+      "reason_code": "content_denied",
+      "measurements": {},
+      "evidence_refs": []
+    }
+  ],
+  "terminal_stage": "policy",
+  "evidence_refs": [],
+  "error": null
+}

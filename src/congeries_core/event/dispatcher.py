@@ -104,6 +104,11 @@ class EventDispatcher:
             maxsize=self._policy.observability_queue_capacity
         )
         self._worker: asyncio.Task[None] | None = None
+        # Deterministic publishers may ask for the same EventId again after a
+        # local retry.  Reuse the already allocated timestamp/sequence when the
+        # logical event is identical, and reject identity reuse with new data.
+        # Durable at-least-once recovery remains the AuditOutbox's responsibility.
+        self._created_events: dict[EventId, RuntimeEvent] = {}
         self.diagnostics: list[EventDiagnostic] = []
 
     async def create_event(
@@ -119,9 +124,31 @@ class EventDispatcher:
         sensitivity: Sensitivity,
         delivery_class: DeliveryClass,
         payload: Mapping[str, PayloadField],
+        event_id: EventId | None = None,
     ) -> RuntimeEvent:
+        if event_id is not None and event_id in self._created_events:
+            existing = self._created_events[event_id]
+            if (
+                existing.event_type != event_type
+                or existing.schema_version != schema_version
+                or existing.run_id != run_id
+                or existing.root_run_id != root_run_id
+                or existing.parent_run_id != parent_run_id
+                or existing.scope != scope
+                or existing.correlation_id != context.trace.correlation_id
+                or existing.causation_id != context.trace.causation_id
+                or existing.sensitivity is not sensitivity
+                or existing.delivery_class is not delivery_class
+                or existing.payload != ClassifiedPayload(payload)
+            ):
+                raise core_error(
+                    ErrorCategory.CONFLICT,
+                    "event_identity_conflict",
+                    "event identity was reused with different Event data",
+                )
+            return existing
         event = RuntimeEvent(
-            event_id=EventId.new(),
+            event_id=event_id or EventId.new(),
             event_type=event_type,
             schema_version=schema_version,
             occurred_at=self._clock.now(),
@@ -137,6 +164,8 @@ class EventDispatcher:
             payload=ClassifiedPayload(payload),
         )
         self._schemas.validate(event)
+        if event_id is not None:
+            self._created_events[event.event_id] = event
         return event
 
     async def publish(

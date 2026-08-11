@@ -3,6 +3,7 @@
 from .model import (
     AgentNodeConfig,
     ApprovalNodeConfig,
+    EvaluationNodeConfig,
     ExecutionPolicy,
     NodeOutputReference,
     UnsupportedNodeConfig,
@@ -43,6 +44,7 @@ __all__ = [
     "ApprovalNodeConfig",
     "AuthorizedNodeOutputPersistence",
     "DeterministicScheduler",
+    "EvaluationNodeConfig",
     "ExecutionPolicy",
     "LoadNodeOutputRequest",
     "NodeOutputPersistence",

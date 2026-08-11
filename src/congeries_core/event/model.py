@@ -70,6 +70,8 @@ class CoreEventType(StrEnum):
     CHECKPOINT_FAILED = "core.checkpoint.failed"
     CHECKPOINT_MIGRATION_AUTHORIZED = "core.checkpoint.migration_authorized"
     CHECKPOINT_FALLBACK_AUTHORIZED = "core.checkpoint.fallback_authorized"
+    EVALUATION_STARTED = "core.evaluation.started"
+    EVALUATION_VERDICT_RECORDED = "core.evaluation.verdict_recorded"
     ARTIFACT_CREATED = "core.artifact.created"
     PLUGIN_LIFECYCLE_CHANGED = "core.plugin.lifecycle_changed"
 
@@ -148,8 +150,30 @@ class RuntimeEvent:
 
     @property
     def payload_digest(self) -> str:
+        # Acknowledgement proves the logical event, not one envelope allocation.
+        # Excluding event_id, occurred_at, and sequence keeps the digest stable
+        # when the same deterministic audit event is reconstructed after restart.
         encoded = json.dumps(
-            self.to_data(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            {
+                "event_type": self.event_type,
+                "schema_version": self.schema_version,
+                "run_id": self.run_id.value,
+                "root_run_id": self.root_run_id.value,
+                "parent_run_id": (
+                    self.parent_run_id.value if self.parent_run_id else None
+                ),
+                "scope": self.scope.to_data(),
+                "correlation_id": self.correlation_id.value,
+                "causation_id": (
+                    self.causation_id.value if self.causation_id else None
+                ),
+                "sensitivity": self.sensitivity.wire_name,
+                "delivery_class": self.delivery_class.value,
+                "payload": self.payload.to_data(),
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
         ).encode()
         return hashlib.sha256(encoded).hexdigest()
 

@@ -1,0 +1,29 @@
+{
+  "contract_version": "1",
+  "evaluation_id": "evaluation-fixture",
+  "value": {
+    "value": "safe"
+  },
+  "input_schema": {
+    "namespace": "test",
+    "name": "evaluation_input",
+    "version": "1"
+  },
+  "policy_ref": "policy-1",
+  "quality_evaluator_id": "quality-1",
+  "quality_profile_ref": "external:profile-1",
+  "scope": {
+    "namespace": "core",
+    "kind": "run",
+    "id": "run-scope",
+    "parent": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    }
+  },
+  "constraints": {
+    "safe": true
+  }
+}

@@ -7,7 +7,7 @@
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
 - Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [RFC-0004](RFC-0004-execution-run-lifecycle.md), [RFC-0011](RFC-0011-checkpoint-recovery.md)
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [RFC-0004](RFC-0004-execution-run-lifecycle.md), [RFC-0011](RFC-0011-checkpoint-recovery.md), [RFC-0012](RFC-0012-evaluation.md)
 - Supersedes: None
 
 ## 1. Scope
@@ -164,22 +164,26 @@ and execution policy explicitly define a partial-success shape.
 
 The first Core reference runtime is deliberately smaller than the complete node
 catalog. It implements the normalized Workflow contracts, validates the DAG
-before execution, schedules dependencies deterministically, and executes
-AgentNode by creating child AgentRuns. Unsupported node contracts are rejected
-during validation; they are never silently skipped or treated as success.
+before execution, schedules dependencies deterministically, executes AgentNode
+by creating child AgentRuns, coordinates ApprovalNode, and composes EvaluationNode
+through the [Evaluation contract](RFC-0012-evaluation.md). Unsupported node
+contracts are rejected during validation; they are never silently skipped or
+treated as success.
 
-The reference runtime commits workflow-start and stable AgentNode boundaries
-through CheckpointCoordinator. On recovery, CheckpointRestorer must finish
+The reference runtime commits workflow-start and stable AgentNode and
+EvaluationNode boundaries through CheckpointCoordinator. On recovery,
+CheckpointRestorer must finish
 rehydrating stable node outcomes, pending nodes, external references, and
 side-effect identities before dependency scheduling resumes. A node with a
 stable committed outcome is not dispatched again. Work interrupted after the
 latest committed boundary may replay under the at-least-once contract.
 
-AgentNode text or JSON output required by downstream nodes or recovery is not
-copied into a Checkpoint. Before that node outcome becomes a stable boundary, an
-injected authorized persistence boundary converts the required output into typed,
-scoped durable references. If no durable reference is available, the executor
-must not commit the node as stably completed. The first reference runtime selects
+AgentNode output and EvaluationResult required by downstream nodes or recovery
+are not copied into a Checkpoint. Before that node outcome becomes a stable
+boundary, an injected authorized persistence boundary converts the required
+value into typed, scoped durable references. Evaluation non-success results use
+the same boundary through `error_ref`. If no durable reference is available, the
+executor must not commit the node boundary. The first reference runtime selects
 no mandatory Artifact or storage implementation.
 
 The injected `NodeOutputPersistence` boundary exposes `persist` and `load`; each
@@ -189,8 +193,8 @@ operation receives `RuntimeCallContext` and returns or consumes a typed, scoped
 `core.workflow.node.execute` v1. The Checkpoint wire contract remains unchanged.
 
 ApprovalNode composes the existing durable ApprovalCoordinator. SkillNode,
-ToolNode, ContextNode, EvaluationNode, custom node registration, and external
-Workflow engine adapters are later slices.
+ToolNode, ContextNode, custom node registration, and external Workflow engine
+adapters are later slices.
 Delivering the smaller reference runtime does not change this RFC to Implemented;
 full conformance still requires the complete contract below.
 

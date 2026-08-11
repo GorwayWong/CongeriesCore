@@ -4,6 +4,14 @@ from dataclasses import replace
 
 import pytest
 
+from congeries_core.evaluation import (
+    EVALUATION_CONTRACT_VERSION,
+    EvaluationRequest,
+    EvaluationStage,
+    EvaluationStageResult,
+    EvaluationVerdict,
+    result_from_stages,
+)
 from congeries_core.event.dispatcher import (
     EventDeliveryPolicy,
     EventDispatcher,
@@ -27,10 +35,13 @@ from congeries_core.policy.authorization import CorePrincipalKind, RuntimePrinci
 from congeries_core.runtime.errors import CoreError, ErrorCategory
 from congeries_core.runtime.ids import (
     AcknowledgementId,
+    EvaluationId,
     EventId,
     PrincipalId,
+    ProviderId,
     RunId,
 )
+from congeries_core.runtime.schema import SchemaRef
 
 from .support import NOW, DenyingPolicy, FixedClock, MatchingAllowPolicy, call_context
 
@@ -96,6 +107,68 @@ async def make_event(
         delivery_class=delivery_class,
         payload=payload or {},
     )
+
+
+@pytest.mark.asyncio
+async def test_evaluation_verdict_audit_is_acked_deduplicated_and_redacted() -> None:
+    sink = InMemoryEventSink("audit", capabilities(DeliveryClass.AUDIT))
+    ledger = InMemoryEventLedger()
+    event_dispatcher, _ = dispatcher(
+        SinkRegistration(sink, required_for_audit=True),
+        ledger=ledger,
+        policy=MatchingAllowPolicy(),
+    )
+    restarted_dispatcher, _ = dispatcher(
+        SinkRegistration(sink, required_for_audit=True),
+        policy=MatchingAllowPolicy(),
+        ledger=ledger,
+    )
+    publisher = RuntimeEventPublisher(event_dispatcher)
+    context = call_context()
+    request = EvaluationRequest(
+        EVALUATION_CONTRACT_VERSION,
+        EvaluationId("evaluation-event"),
+        {"secret": "must-not-appear"},
+        SchemaRef("test", "evaluation_input", "1"),
+        "policy-1",
+        ProviderId("quality-1"),
+        "external:profile-1",
+        context.scope,
+        {"secret_constraint": "must-not-appear"},
+    )
+    result = result_from_stages(
+        request.evaluation_id,
+        (
+            EvaluationStageResult(
+                EvaluationStage.SCHEMA, EvaluationVerdict.PASSED, "schema_valid"
+            ),
+            EvaluationStageResult(
+                EvaluationStage.POLICY, EvaluationVerdict.PASSED, "policy_passed"
+            ),
+            EvaluationStageResult(
+                EvaluationStage.QUALITY,
+                EvaluationVerdict.PASSED,
+                "quality_passed",
+                {"raw_measurement": "must-not-appear"},
+            ),
+        ),
+    )
+
+    await publisher.evaluation_verdict_recorded(request, result, context)
+    await publisher.evaluation_verdict_recorded(request, result, context)
+    await RuntimeEventPublisher(restarted_dispatcher).evaluation_verdict_recorded(
+        request, result, context
+    )
+
+    assert len(sink.events) == 1
+    event = sink.events[0]
+    assert event.event_type == CoreEventType.EVALUATION_VERDICT_RECORDED.value
+    assert event.event_id.value == f"evaluation-verdict:{result.digest}"
+    visible = event.payload.visible_data()
+    assert visible["result_digest"] == result.digest
+    serialized = str(event.to_data())
+    assert "must-not-appear" not in serialized
+    assert "raw_measurement" not in serialized
 
 
 def test_event_model_schema_and_redaction() -> None:

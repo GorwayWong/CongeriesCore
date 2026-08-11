@@ -24,6 +24,14 @@ from congeries_core.checkpoint import (
     SideEffectOutcome,
     SideEffectRecord,
 )
+from congeries_core.evaluation import (
+    EVALUATION_CONTRACT_VERSION,
+    EVALUATION_RESULT_SCHEMA,
+    EvaluationHarness,
+    EvaluationRequest,
+    EvaluationResult,
+    EvaluationVerdict,
+)
 from congeries_core.harness.agent import AgentExecutionResult, AgentRuntime
 from congeries_core.policy.authorization import (
     AccessRequest,
@@ -46,6 +54,7 @@ from congeries_core.runtime.ids import (
     ApprovalId,
     CheckpointRef,
     CorrelationId,
+    EvaluationId,
     IdempotencyKey,
     NodeId,
     PrincipalId,
@@ -71,6 +80,7 @@ from congeries_core.state.service import RunService
 from .model import (
     AgentNodeConfig,
     ApprovalNodeConfig,
+    EvaluationNodeConfig,
     NodeOutputReference,
     WorkflowContext,
     WorkflowDefinition,
@@ -100,6 +110,14 @@ class _AgentDispatch:
     idempotency_key: IdempotencyKey
 
 
+@dataclass(frozen=True, slots=True)
+class _EvaluationDispatch:
+    result: EvaluationResult
+    input_value: JsonValue
+    node_context: RuntimeCallContext
+    idempotency_key: IdempotencyKey
+
+
 class WorkflowRuntime:
     def __init__(
         self,
@@ -116,6 +134,7 @@ class WorkflowRuntime:
         recovery: RecoveryCoordinator,
         approvals: ApprovalCoordinator,
         clock: Clock,
+        evaluations: EvaluationHarness | None = None,
     ) -> None:
         self._validator = validator
         self._runs = runs
@@ -129,6 +148,7 @@ class WorkflowRuntime:
         self._recovery = recovery
         self._approvals = approvals
         self._clock = clock
+        self._evaluations = evaluations
 
     async def execute(
         self, definition: WorkflowDefinition, context: WorkflowContext
@@ -325,6 +345,16 @@ class WorkflowRuntime:
             )
 
         states = {item.node_id: item for item in checkpoint.node_states}
+        # A committed Evaluation failure is terminal state, not interrupted work.
+        # Resolve it before constructing the scheduler so neither this node nor a
+        # dependent node can be selected during recovery.
+        stable_failure = await self._stable_evaluation_failure(
+            workflow.definition, run, context.runtime, states
+        )
+        if stable_failure is not None:
+            return await self._terminal_failure(
+                run, stable_failure, workflow.definition, states
+            )
         output_refs = self._output_refs(workflow.definition, states)
         completed = {
             item.node_id
@@ -348,6 +378,17 @@ class WorkflowRuntime:
             if node.node_type == WorkflowNodeType.APPROVAL.value:
                 return await self._request_approval(
                     workflow.definition,
+                    current_run,
+                    context,
+                    current_checkpoint,
+                    states,
+                    output_refs,
+                    scheduler,
+                    node,
+                )
+            if node.node_type == WorkflowNodeType.EVALUATION.value:
+                return await self._execute_evaluation(
+                    workflow,
                     current_run,
                     context,
                     current_checkpoint,
@@ -447,6 +488,187 @@ class WorkflowRuntime:
             output_refs,
         )
 
+    async def _execute_evaluation(
+        self,
+        workflow: ValidatedWorkflow,
+        run: WorkflowRun,
+        workflow_context: WorkflowContext,
+        checkpoint: Checkpoint,
+        states: dict[NodeId, NodeCheckpointState],
+        output_refs: dict[NodeId, CheckpointReference],
+        scheduler: DeterministicScheduler,
+        node: WorkflowNode,
+    ) -> WorkflowExecutionOutcome:
+        if self._evaluations is None:
+            raise core_error(
+                ErrorCategory.UNAVAILABLE,
+                "evaluation_harness_unavailable",
+                "WorkflowRuntime has no Evaluation harness",
+            )
+        evaluations = self._evaluations
+        access = self._node_access(
+            workflow.definition, run, node, workflow_context.runtime
+        )
+
+        async def operation(call: AuthorizedCall) -> object:
+            if not isinstance(node.config, EvaluationNodeConfig):
+                raise AssertionError("validated EvaluationNode config changed type")
+            if node.input_schema is None:
+                raise AssertionError("validated EvaluationNode lost input schema")
+            key = self._node_idempotency_key(
+                run.run_id, node.node_id, node.node_type, workflow_context
+            )
+            node_context = call.context.narrow(
+                scope=node.scope,
+                deadline=self._node_deadline(call.context, node),
+                idempotency_key=key,
+            )
+            input_value = await self._node_input(
+                workflow.definition,
+                run,
+                workflow_context,
+                output_refs,
+                node,
+                node_context,
+            )
+            request = EvaluationRequest(
+                contract_version=EVALUATION_CONTRACT_VERSION,
+                evaluation_id=self._evaluation_id(run.run_id, node.node_id),
+                value=input_value,
+                input_schema=node.input_schema,
+                policy_ref=node.config.policy_ref,
+                quality_evaluator_id=node.config.quality_evaluator_id,
+                quality_profile_ref=node.config.quality_profile_ref,
+                scope=node.scope,
+                constraints={},
+            )
+            result = await evaluations.evaluate(request, node_context)
+            if result.evaluation_id != request.evaluation_id:
+                raise core_error(
+                    ErrorCategory.PROTOCOL_FAILURE,
+                    "workflow_evaluation_identity_mismatch",
+                    "Evaluation result identity does not match its request",
+                )
+            result_value = as_json_value(result.to_data(), "Evaluation result")
+            self._schemas.validate(EVALUATION_RESULT_SCHEMA, result_value)
+            return _EvaluationDispatch(result, input_value, node_context, key)
+
+        raw = await self._dispatcher.dispatch(access, operation)
+        if not isinstance(raw, _EvaluationDispatch):
+            raise core_error(
+                ErrorCategory.PROTOCOL_FAILURE,
+                "workflow_evaluation_dispatch_invalid",
+                "EvaluationNode dispatch returned an invalid result",
+            )
+        # EvaluationHarness returned only after the verdict AUDIT was
+        # acknowledged.  Persistence is therefore the next allowed side effect.
+        reference = await self._outputs.persist(
+            PersistNodeOutputRequest(
+                run_id=run.run_id,
+                node_id=node.node_id,
+                schema=EVALUATION_RESULT_SCHEMA,
+                value=as_json_value(raw.result.to_data(), "Evaluation result"),
+                scope=node.scope,
+                idempotency_key=raw.idempotency_key,
+            ),
+            raw.node_context,
+        )
+        succeeded = raw.result.verdict is EvaluationVerdict.PASSED
+        outcome = self._evaluation_outcome(raw.result.verdict)
+        candidate_states = dict(states)
+        candidate_states[node.node_id] = NodeCheckpointState(
+            node.node_id,
+            outcome,
+            output_ref=reference if succeeded else None,
+            error_ref=None if succeeded else reference,
+        )
+        candidate_outputs = dict(output_refs)
+        if succeeded:
+            candidate_outputs[node.node_id] = reference
+        # The node is absent from pending_nodes once this boundary commits even
+        # when it failed.  It joins scheduler.completed only on PASSED below.
+        boundary_nodes = {*scheduler.completed, node.node_id}
+        stable = self._checkpoint(
+            run,
+            previous=checkpoint,
+            node_states=tuple(candidate_states.values()),
+            pending_nodes=tuple(
+                node_id
+                for node_id in sorted(
+                    (item.node_id for item in workflow.definition.nodes),
+                    key=lambda item: item.value,
+                )
+                if node_id not in boundary_nodes
+            ),
+            output_refs=candidate_outputs,
+            side_effects=checkpoint.side_effects,
+            approvals=checkpoint.approvals,
+        )
+        committed_run = await self._checkpoints.save(
+            self._checkpoint_provider_id,
+            stable,
+            run.state_version,
+            workflow_context.runtime,
+        )
+        if succeeded:
+            # Checkpoint CAS is the unlock gate.  Moving this call above save()
+            # would allow downstream work to observe an unstable result.
+            scheduler.mark_completed(node.node_id)
+            return await self._drive(workflow, committed_run, workflow_context, stable)
+        return await self._terminal_failure(
+            committed_run,
+            self._evaluation_error(raw.result),
+            workflow.definition,
+            candidate_states,
+        )
+
+    async def _stable_evaluation_failure(
+        self,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        context: RuntimeCallContext,
+        states: dict[NodeId, NodeCheckpointState],
+    ) -> ErrorDetail | None:
+        # Stable non-success results are stored through error_ref using the same
+        # typed EvaluationResult schema.  Loading and validating that value lets
+        # recovery terminalize without redispatching an external evaluator.
+        nodes = {item.node_id: item for item in definition.nodes}
+        for node_id, state in sorted(states.items(), key=lambda item: item[0].value):
+            node = nodes.get(node_id)
+            if (
+                node is None
+                or node.node_type != WorkflowNodeType.EVALUATION.value
+                or state.outcome is NodeOutcome.SUCCEEDED
+            ):
+                continue
+            if state.error_ref is None:
+                raise core_error(
+                    ErrorCategory.PROTOCOL_FAILURE,
+                    "workflow_evaluation_error_reference_missing",
+                    "stable non-successful EvaluationNode has no result reference",
+                )
+            value = await self._outputs.load(
+                LoadNodeOutputRequest(
+                    run.run_id,
+                    node_id,
+                    EVALUATION_RESULT_SCHEMA,
+                    state.error_ref,
+                    node.scope,
+                ),
+                context,
+            )
+            result = EvaluationResult.from_data(
+                as_object(value, "stable Evaluation result")
+            )
+            if self._evaluation_outcome(result.verdict) is not state.outcome:
+                raise core_error(
+                    ErrorCategory.PROTOCOL_FAILURE,
+                    "workflow_evaluation_outcome_mismatch",
+                    "stable Evaluation result and node outcome do not match",
+                )
+            return self._evaluation_error(result)
+        return None
+
     async def _dispatch_agent(
         self,
         definition: WorkflowDefinition,
@@ -461,7 +683,9 @@ class WorkflowRuntime:
             if not isinstance(node.config, AgentNodeConfig):
                 raise AssertionError("validated AgentNode config changed type")
             node.scope.require_narrower_than(run.scope)
-            key = self._node_idempotency_key(run.run_id, node.node_id, workflow_context)
+            key = self._node_idempotency_key(
+                run.run_id, node.node_id, node.node_type, workflow_context
+            )
             node_context = call.context.narrow(
                 scope=node.scope,
                 deadline=self._node_deadline(call.context, node),
@@ -749,10 +973,7 @@ class WorkflowRuntime:
             previous_checkpoint_ref=previous.ref if previous else None,
             node_states=tuple(sorted(node_states, key=lambda item: item.node_id.value)),
             pending_nodes=tuple(sorted(pending_nodes, key=lambda item: item.value)),
-            external_refs=tuple(
-                output_refs[node_id]
-                for node_id in sorted(output_refs, key=lambda item: item.value)
-            ),
+            external_refs=self._checkpoint_references(node_states, output_refs),
             side_effects=side_effects,
             approvals=approvals,
             created_at=self._clock.now(),
@@ -818,6 +1039,24 @@ class WorkflowRuntime:
             for node_id, state in states.items()
             if node_id in node_ids and state.output_ref is not None
         }
+
+    def _checkpoint_references(
+        self,
+        node_states: tuple[NodeCheckpointState, ...],
+        output_refs: dict[NodeId, CheckpointReference],
+    ) -> tuple[CheckpointReference, ...]:
+        # error_ref is just as durable as output_ref.  Including both in
+        # external_refs makes a committed failure self-contained for recovery.
+        references = [
+            output_refs[node_id]
+            for node_id in sorted(output_refs, key=lambda item: item.value)
+        ]
+        references.extend(
+            state.error_ref
+            for state in sorted(node_states, key=lambda item: item.node_id.value)
+            if state.error_ref is not None
+        )
+        return tuple(dict.fromkeys(references))
 
     def _public_output_refs(
         self,
@@ -887,11 +1126,15 @@ class WorkflowRuntime:
         return node_deadline
 
     def _node_idempotency_key(
-        self, run_id: RunId, node_id: NodeId, context: WorkflowContext
+        self,
+        run_id: RunId,
+        node_id: NodeId,
+        node_type: str,
+        context: WorkflowContext,
     ) -> IdempotencyKey:
         parent = context.runtime.idempotency_key
         identity = "|".join(
-            (parent.value if parent else "", run_id.value, node_id.value, "agent")
+            (parent.value if parent else "", run_id.value, node_id.value, node_type)
         )
         digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
         return IdempotencyKey(f"workflow-node-{digest}")
@@ -901,6 +1144,48 @@ class WorkflowRuntime:
             f"{run_id.value}|{node_id.value}|approval".encode()
         ).hexdigest()
         return ApprovalId(f"workflow-approval-{digest}")
+
+    def _evaluation_id(self, run_id: RunId, node_id: NodeId) -> EvaluationId:
+        digest = hashlib.sha256(
+            f"{run_id.value}|{node_id.value}|evaluation|1".encode()
+        ).hexdigest()
+        return EvaluationId(f"workflow-evaluation-{digest}")
+
+    def _evaluation_outcome(self, verdict: EvaluationVerdict) -> NodeOutcome:
+        if verdict is EvaluationVerdict.PASSED:
+            return NodeOutcome.SUCCEEDED
+        if verdict in {
+            EvaluationVerdict.POLICY_DENIED,
+            EvaluationVerdict.POLICY_INDETERMINATE,
+        }:
+            return NodeOutcome.DENIED
+        if verdict is EvaluationVerdict.TIMED_OUT:
+            return NodeOutcome.TIMED_OUT
+        if verdict is EvaluationVerdict.CANCELLED:
+            return NodeOutcome.CANCELLED
+        return NodeOutcome.FAILED
+
+    def _evaluation_error(self, result: EvaluationResult) -> ErrorDetail:
+        if result.error is not None:
+            return result.error
+        if result.verdict in {
+            EvaluationVerdict.POLICY_DENIED,
+            EvaluationVerdict.POLICY_INDETERMINATE,
+        }:
+            category = ErrorCategory.DENIED
+        elif result.verdict is EvaluationVerdict.QUALITY_FAILED:
+            category = ErrorCategory.PARTIAL_RESULT
+        else:
+            category = ErrorCategory.INVALID_REQUEST
+        return ErrorDetail(
+            category,
+            result.verdict.value,
+            "Evaluation did not pass",
+            metadata={
+                "evaluation_id": result.evaluation_id.value,
+                "terminal_stage": result.terminal_stage.value,
+            },
+        )
 
     def _fingerprint(self, value: JsonValue) -> str:
         encoded = json.dumps(

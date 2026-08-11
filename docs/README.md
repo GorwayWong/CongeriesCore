@@ -98,6 +98,10 @@ with relative links to the owning document.
 - [RFC Registry](rfcs/README.md)
 - [ADR Registry](adrs/README.md)
 
+## Review Guides
+
+- [Evaluation Pipeline Code Review Guide](reviews/evaluation-pipeline-code-review.md)
+
 ## Legacy Migration Pages
 
 - [Original system overview path](Agent_Harness_Runtime_Core_System_Overview.md)

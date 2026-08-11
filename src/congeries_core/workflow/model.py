@@ -23,6 +23,7 @@ from congeries_core.runtime.ids import (
     DefinitionId,
     ModelBindingRef,
     NodeId,
+    ProviderId,
     RunId,
     WorkflowId,
 )
@@ -290,6 +291,47 @@ class ApprovalNodeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EvaluationNodeConfig:
+    """Opaque bindings selected by a node; Core never embeds their business rules."""
+
+    policy_ref: str
+    quality_evaluator_id: ProviderId
+    quality_profile_ref: str
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("policy_ref", self.policy_ref),
+            ("quality_profile_ref", self.quality_profile_ref),
+        ):
+            if not value or value != value.strip():
+                raise ValueError(f"{name} must be non-empty and trimmed")
+
+    def to_data(self) -> dict[str, str]:
+        return {
+            "policy_ref": self.policy_ref,
+            "quality_evaluator_id": self.quality_evaluator_id.value,
+            "quality_profile_ref": self.quality_profile_ref,
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> EvaluationNodeConfig:
+        _require_keys(
+            data,
+            {"policy_ref", "quality_evaluator_id", "quality_profile_ref"},
+            "EvaluationNode config",
+        )
+        return cls(
+            policy_ref=_as_string(data["policy_ref"], "Evaluation policy ref"),
+            quality_evaluator_id=ProviderId(
+                _as_string(data["quality_evaluator_id"], "quality evaluator id")
+            ),
+            quality_profile_ref=_as_string(
+                data["quality_profile_ref"], "quality profile ref"
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class UnsupportedNodeConfig:
     data: JsonValue
 
@@ -303,7 +345,9 @@ class UnsupportedNodeConfig:
         return self.data
 
 
-type WorkflowNodeConfig = AgentNodeConfig | ApprovalNodeConfig | UnsupportedNodeConfig
+type WorkflowNodeConfig = (
+    AgentNodeConfig | ApprovalNodeConfig | EvaluationNodeConfig | UnsupportedNodeConfig
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,6 +427,8 @@ class WorkflowNode:
             config: WorkflowNodeConfig = AgentNodeConfig.from_data(raw_config)
         elif node_type == WorkflowNodeType.APPROVAL.value:
             config = ApprovalNodeConfig.from_data(raw_config)
+        elif node_type == WorkflowNodeType.EVALUATION.value:
+            config = EvaluationNodeConfig.from_data(raw_config)
         else:
             config = UnsupportedNodeConfig(as_json_value(raw_config, "node config"))
         raw_input_schema = data["input_schema"]

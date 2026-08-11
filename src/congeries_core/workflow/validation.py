@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NoReturn
 
+from congeries_core.evaluation import EVALUATION_RESULT_SCHEMA, evaluation_actions
 from congeries_core.policy.authorization import ActionRegistry
 from congeries_core.runtime.errors import ErrorCategory, core_error
 from congeries_core.runtime.ids import NodeId
@@ -13,6 +14,7 @@ from congeries_core.runtime.schema import SchemaRef, SchemaRegistry
 from .model import (
     AgentNodeConfig,
     ApprovalNodeConfig,
+    EvaluationNodeConfig,
     WorkflowDefinition,
     WorkflowInputSource,
     WorkflowNode,
@@ -41,6 +43,7 @@ class WorkflowValidator:
             {
                 (WorkflowNodeType.AGENT.value, "1"),
                 (WorkflowNodeType.APPROVAL.value, "1"),
+                (WorkflowNodeType.EVALUATION.value, "1"),
             }
         )
 
@@ -170,6 +173,62 @@ class WorkflowValidator:
                     "ApprovalNode does not accept or produce a value in v0.2",
                 )
             node.config.prompt_ref.scope.require_narrower_than(node.scope)
+        elif node.node_type == WorkflowNodeType.EVALUATION.value:
+            if not isinstance(node.config, EvaluationNodeConfig):
+                self._invalid(
+                    "workflow_evaluation_config_invalid",
+                    "EvaluationNode requires EvaluationNodeConfig",
+                )
+            if (
+                node.input_schema is None
+                or node.output_schema != EVALUATION_RESULT_SCHEMA
+                or len(node.input_bindings) != 1
+            ):
+                self._invalid(
+                    "workflow_evaluation_contract_incomplete",
+                    "EvaluationNode requires one input and the fixed result schema",
+                )
+            if not node.idempotency_required:
+                self._invalid(
+                    "workflow_evaluation_idempotency_required",
+                    "EvaluationNode requires idempotency",
+                )
+            declared = {permission.action for permission in node.permissions}
+            if any(action not in declared for action in evaluation_actions()):
+                self._invalid(
+                    "workflow_evaluation_permission_missing",
+                    "EvaluationNode must declare every Evaluation action",
+                )
+            # Action presence alone is insufficient: a node could otherwise
+            # declare permission for policy A while its config dispatches policy
+            # B.  Bind every action to the exact configured resource up front.
+            expected_resources = {
+                "evaluation.policy.evaluate": (
+                    "evaluation_policy",
+                    node.config.policy_ref,
+                ),
+                "evaluation.quality.capabilities": (
+                    "quality_evaluator",
+                    node.config.quality_evaluator_id.value,
+                ),
+                "evaluation.quality.evaluate": (
+                    "quality_evaluator",
+                    node.config.quality_evaluator_id.value,
+                ),
+            }
+            for action in evaluation_actions():
+                kind, resource_id = expected_resources[action.name]
+                if not any(
+                    permission.action == action
+                    and permission.resource.namespace == "core"
+                    and permission.resource.kind == kind
+                    and permission.resource.id.value == resource_id
+                    for permission in node.permissions
+                ):
+                    self._invalid(
+                        "workflow_evaluation_permission_resource_invalid",
+                        "Evaluation permission resource does not match node config",
+                    )
 
     def _topological_order(
         self, definition: WorkflowDefinition, nodes: dict[NodeId, WorkflowNode]

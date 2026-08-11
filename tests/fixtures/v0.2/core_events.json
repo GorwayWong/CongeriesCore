@@ -21,6 +21,8 @@
   "core.checkpoint.failed",
   "core.checkpoint.migration_authorized",
   "core.checkpoint.fallback_authorized",
+  "core.evaluation.started",
+  "core.evaluation.verdict_recorded",
   "core.artifact.created",
   "core.plugin.lifecycle_changed"
 ]

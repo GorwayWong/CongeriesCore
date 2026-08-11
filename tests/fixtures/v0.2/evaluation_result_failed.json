@@ -1,0 +1,33 @@
+{
+  "contract_version": "1",
+  "evaluation_id": "evaluation-fixture",
+  "verdict": "quality_failed",
+  "stage_results": [
+    {
+      "stage": "schema",
+      "verdict": "passed",
+      "reason_code": "schema_valid",
+      "measurements": {},
+      "evidence_refs": []
+    },
+    {
+      "stage": "policy",
+      "verdict": "passed",
+      "reason_code": "policy_passed",
+      "measurements": {},
+      "evidence_refs": []
+    },
+    {
+      "stage": "quality",
+      "verdict": "quality_failed",
+      "reason_code": "quality_not_met",
+      "measurements": {
+        "opaque": "external"
+      },
+      "evidence_refs": []
+    }
+  ],
+  "terminal_stage": "quality",
+  "evidence_refs": [],
+  "error": null
+}

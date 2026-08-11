@@ -11,6 +11,12 @@ from congeries_core.checkpoint import (
     CheckpointPage,
     checkpoint_actions,
 )
+from congeries_core.evaluation import (
+    EvaluationRequest,
+    EvaluationResult,
+    QualityEvaluatorCapabilities,
+    evaluation_actions,
+)
 from congeries_core.event.model import CoreEventType
 from congeries_core.harness.agent import AgentSpec
 from congeries_core.policy.authorization import ActionRef
@@ -166,4 +172,29 @@ def test_workflow_v02_fixtures_round_trip_exactly() -> None:
     assert actions == workflow_actions()
     assert _serialized([action.to_data() for action in actions]) == _text(
         "workflow_actions.json"
+    )
+
+
+def test_evaluation_v02_fixtures_round_trip_exactly() -> None:
+    for name, contract in (
+        ("evaluation_request.json", EvaluationRequest),
+        ("evaluation_result_passed.json", EvaluationResult),
+        ("evaluation_result_denied.json", EvaluationResult),
+        ("evaluation_result_failed.json", EvaluationResult),
+        ("evaluation_capabilities.json", QualityEvaluatorCapabilities),
+        ("workflow_evaluation_definition.json", WorkflowDefinition),
+    ):
+        value = contract.from_data(_object(name))
+        assert contract.from_data(value.to_data()) == value
+        assert _serialized(value.to_data()) == _text(name)
+
+    values = as_array(
+        json.loads(_text("evaluation_actions.json")), "Evaluation action fixture"
+    )
+    actions = tuple(
+        ActionRef.from_data(as_object(item, "Evaluation action")) for item in values
+    )
+    assert actions == evaluation_actions()
+    assert _serialized([action.to_data() for action in actions]) == _text(
+        "evaluation_actions.json"
     )
