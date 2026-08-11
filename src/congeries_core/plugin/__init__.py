@@ -12,6 +12,7 @@ from .events import (
     PluginEventPublisher,
     RuntimePluginEventPublisher,
 )
+from .invocation import PluginCapabilityInvoker
 from .lifecycle import (
     ExecutionLease,
     PluginLifecycleController,
@@ -87,6 +88,7 @@ __all__ = [
     "ManifestValidator",
     "NullPluginEventPublisher",
     "PermissionRepresentationChecker",
+    "PluginCapabilityInvoker",
     "PluginDependency",
     "PluginEventPublisher",
     "PluginHookName",

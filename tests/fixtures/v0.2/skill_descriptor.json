@@ -1,0 +1,25 @@
+{
+  "ref": {
+    "namespace": "core",
+    "kind": "skill",
+    "id": "test.capabilities.skill",
+    "owning_extension": "test.capabilities",
+    "contract_version": "1"
+  },
+  "title": "Test Skill",
+  "summary": "Progressive test resources",
+  "resources": [
+    {
+      "resource_id": "guide",
+      "kind": "instruction",
+      "path": "guides/main.md",
+      "media_type": "text/plain",
+      "max_bytes": 64,
+      "action": {
+        "namespace": "core",
+        "name": "skill.resource.read",
+        "version": "1"
+      }
+    }
+  ]
+}

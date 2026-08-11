@@ -494,12 +494,41 @@ Acceptance:
 
 ### Task 5.2 Skill and Tool Registries
 
-Status: Not Started
+Status: Implemented in 0.2.0
+
+Delivered:
+
+- RFC-0013 with exact Skill v1, Tool v1, CapabilityRef, AgentSpec v2, migration,
+  authorization, retry, event, and lease semantics
+- Frozen descriptors, requests, results, implementation wrappers, strict JSON
+  serialization, canonical Skill byte accounting, and pure path/policy validation
+- Read-only SkillRegistry and ToolRegistry facades over the atomic Plugin
+  capability snapshot with current registration identity, owner, Action,
+  permission, and Schema checks
+- PluginCapabilityInvoker shared by PluginManager, progressive Skill loading, and
+  Tool execution without a second registration or lease boundary
+- Resource-specific Skill authorization and bounded lazy reads under one Plugin
+  lease without automatic Agent context injection
+- Schema-aware Tool execution with grant narrowing, whole-call deadline, stable
+  operation identity, in-lease retry, output validation, and replay conflict
+- SkillToolResolver preflight for AgentSpec and future Workflow adapters while
+  Workflow SkillNode/ToolNode execution remains unsupported
+- AgentSpec v2 exact CapabilityRef encoding with byte-exact legacy v1 reading and
+  explicit `upgrade_v2()` migration
+- Redacted Skill and Tool observability events plus exact descriptors, calls,
+  results, actions, events, and dual AgentSpec fixtures
+- Two loader and two executor contract implementations with permission, Schema,
+  grant, retry, timeout, drain race, replay, lease release, and Agent preflight
+  coverage
 
 Implement discovery, versioned registration, progressive Skill loading, typed
 Tool schemas, authorization, execution policy, and idempotency declaration.
 
 Recommended delivery order:
+
+The sequence below is retained as the implementation record. Its step 8 gates
+are satisfied by the Task 5.2 suites together with the shared Plugin registry,
+drain, unload, rollback, and recovery suites.
 
 1. Write and accept the exact Skill and Tool v1 RFC contract. Define stable
    references, contract versions, Skill resource descriptors, Tool input/output
@@ -564,11 +593,66 @@ Status: Not Started
 Implement capability discovery, schema mapping, Context and Tool integration,
 and policy enforcement.
 
+Recommended next slice:
+
+Start this work only after the Task 5.2 change has completed review and the full
+verification gates provide a clean baseline. MCP adds a transport boundary; it
+must adapt the existing capability boundaries rather than creating another
+authorization, schema, retry, or lifecycle path.
+
+Recommended delivery order:
+
+1. Write and accept RFC-0014 before adding runtime code. Freeze MCP capability
+   identity, discovery records, schema mapping, call context, error mapping,
+   cancellation, deadlines, idempotency, lifecycle, and redacted events.
+2. Add frozen transport-neutral descriptors and pure mapping validation. Keep a
+   mandatory MCP SDK out of Core and reject malformed or unsupported remote
+   capabilities before opening a connection or invoking a remote operation.
+3. Adapt discovered MCP Tools through the existing `ToolGateway` contracts and
+   adapt MCP Context access through the existing Context authorization boundary.
+   Every operation receives `RuntimeCallContext` and uses `AuthorizedDispatcher`;
+   the adapter must not expose a second direct invocation API.
+4. Treat remote constraints as narrowing only. Remote discovery cannot replace
+   a declared Action, Schema, Scope, side-effect class, idempotency identity, or
+   local deadline. Plugin-backed adapters keep their Plugin lease for the entire
+   remote call and validation boundary.
+5. Add redacted discovery/invocation observability and structured transport error
+   normalization. Payloads contain references, counts, latency, and safe codes,
+   never remote arguments, results, credentials, exception text, or raw protocol
+   frames.
+6. Run one shared contract suite against two independent fake MCP transports.
+   Cover discovery, schema mapping, default denial, invalid grants, Scope escape,
+   timeout, cancellation, retry identity, malformed replies, disconnects,
+   acquire/drain races, unload during use, and recovery after transport failure.
+
+Explicit exclusions:
+
+- Raw database, table, filesystem, or generic CRUD exposure
+- Agent Tool execution loops and automatic Skill injection
+- Workflow SkillNode/ToolNode scheduling
+- Parallel Workflow scheduling or external Workflow engine integration
+- A mandatory MCP client or server SDK dependency in Core
+
+Failure scenarios:
+
+- Discovery advertises an unsupported kind, version, Action, or Schema
+- A remote capability broadens local Scope or grant constraints
+- Input or output fails local schema validation
+- Authorization, deadline, cancellation, or idempotency context is missing
+- A transport disconnects, times out, returns malformed data, or completes late
+- Plugin drain or unload races with an in-flight Plugin-backed MCP call
+
 Acceptance:
 
 - MCP exposes scoped capability, not raw database tables.
 - MCP calls follow the same authorization, timeout, cancellation, event, and
   error contracts as local capabilities.
+- No MCP adapter can bypass `RuntimeCallContext`, `AuthorizedDispatcher`, local
+  Schema validation, stable operation identity, or a required Plugin lease.
+- Discovery and invocation fail before remote side effects when local reference,
+  Action, Schema, permission, Scope, or grant validation fails.
+- Exact fixtures, dual-transport contract tests, full pytest coverage, Ruff, and
+  Pyright remain green before Task 5.3 is marked Implemented.
 
 ## 7. Phase 6: Events, Storage, Observability, and Compatibility
 

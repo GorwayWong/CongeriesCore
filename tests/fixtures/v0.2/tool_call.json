@@ -1,0 +1,12 @@
+{
+  "tool": {
+    "namespace": "core",
+    "kind": "tool",
+    "id": "test.capabilities.tool",
+    "owning_extension": "test.capabilities",
+    "contract_version": "1"
+  },
+  "input": {
+    "value": "done"
+  }
+}

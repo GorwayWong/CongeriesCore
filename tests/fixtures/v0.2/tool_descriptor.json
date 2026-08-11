@@ -1,0 +1,32 @@
+{
+  "ref": {
+    "namespace": "core",
+    "kind": "tool",
+    "id": "test.capabilities.tool",
+    "owning_extension": "test.capabilities",
+    "contract_version": "1"
+  },
+  "title": "Test Tool",
+  "summary": "Schema-aware test Tool",
+  "input_schema": {
+    "namespace": "test",
+    "name": "tool.input",
+    "version": "1"
+  },
+  "output_schema": {
+    "namespace": "test",
+    "name": "tool.output",
+    "version": "1"
+  },
+  "action": {
+    "namespace": "core",
+    "name": "tool.execute",
+    "version": "1"
+  },
+  "execution_policy": {
+    "timeout_ms": 1000,
+    "max_attempts": 2
+  },
+  "side_effect": "external",
+  "idempotency": "caller_key"
+}

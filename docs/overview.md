@@ -89,6 +89,11 @@ registries. AgentSpec, ContextBinding, and ModelBinding contain references, not
 live Provider or vendor SDK objects. Context and Model calls cannot bypass
 AuthorizedDispatcher.
 
+AgentSpec can also carry exact, versioned Skill and Tool references. AgentRuntime
+preflights those references before changing Run state or calling Context or
+Model providers. It passes only Tool identities to the Model request; it does not
+load Skill resources, inject Skill content, or execute Tool proposals.
+
 MemoryProvider is an independent authorized gateway in v0.2. Callers explicitly
 select a registered Provider and invoke retrieve, remember, forget, or optional
 consolidate operations. AgentRuntime does not automatically read or write
@@ -112,7 +117,8 @@ The verified direct Agent slice includes:
   restricted fallback
 - Active deadline and cancellation propagation to Provider calls
 - Exactly one terminal Model stream event and cleanup of closable streams
-- Root AgentRun execution without a Plugin, Skill, Tool, or MemoryProvider
+- Root AgentRun execution with optional Skill/Tool reference preflight, but no
+  automatic Skill loading or Tool execution loop
 - Authorized Memory capability discovery, pagination, idempotent mutation,
   optional consolidation, cancellation cleanup, and redacted operation events
 - Stable v0.2 compatibility fixtures for Content, Context, Model, AgentSpec,
@@ -126,17 +132,43 @@ The verified direct Agent slice includes:
 - Deterministic schema-policy-quality Evaluation, reliable verdict audit,
   replaceable quality evaluators, and durable EvaluationNode success and failure
   boundaries
+- Atomic Plugin publication, lifecycle, execution leases, drain-safe unload, and
+  failure recovery
+- Immutable Skill/Tool v1 contracts, typed Plugin-registry views, progressive
+  Skill resource reads, schema-aware Tool execution, in-lease retry, and
+  AgentSpec v1/v2 compatibility
 
 The following remain outside this implemented slice:
 
 - Model-driven Tool execution loops
 - Skill, Tool, Context, and custom Workflow node execution
 - Parallel scheduling and external Workflow engine adapters
-- Plugin lifecycle and MCP capability adapters
+- MCP capability adapters
 
 These future capability families must reuse the implemented authorization,
 RuntimeCallContext, cancellation, error, and event boundaries before their own
 delivery tasks can be marked Implemented.
+
+## Skill and Tool in Plain Language
+
+Think of a Skill as a library catalog. Reading the catalog is cheap and has no
+loader side effect. Opening one named item requires an authorized, bounded read;
+Core holds the owning Plugin lease until the content and its byte count have been
+checked. Core then hands the item back to the caller without placing it in an
+Agent context automatically.
+
+Think of a Tool as a guarded function owned by a Plugin. Core checks the input
+schema before the Plugin can run, verifies the declared Action and effective
+Scope, holds one Plugin lease across every allowed retry, checks the output
+schema, and releases the lease even on timeout, cancellation, or failure. All
+attempts share one operation identity so retry cannot quietly become a second
+side effect.
+
+The typed Skill and Tool registries are read-only views of the existing atomic
+Plugin registry. They do not introduce another registration transaction, and a
+resolved public value never exposes the loader or executor. The detailed review
+path and safety checklist are in the
+[Skill and Tool v1 Code Review Guide](reviews/task-5.2-skill-tool-code-review.md).
 
 ## Implemented Minimal Workflow Runtime
 
@@ -222,6 +254,7 @@ and infrastructure remain replaceable through adapters and providers.
 | Runtime Events | [RFC-0010](rfcs/RFC-0010-runtime-events.md) |
 | Checkpoint, commit, and recovery | [RFC-0011](rfcs/RFC-0011-checkpoint-recovery.md) |
 | Evaluation pipeline and node boundary | [RFC-0012](rfcs/RFC-0012-evaluation.md) |
+| Skill and Tool contracts | [RFC-0013](rfcs/RFC-0013-skill-tool-contracts.md) |
 
 Cross-cutting rationale is indexed in the [ADR Registry](adrs/README.md), and
 implementation sequencing is defined in [tasks.md](../tasks.md).

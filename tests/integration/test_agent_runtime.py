@@ -7,6 +7,7 @@ from datetime import timedelta
 import pytest
 
 from congeries_core.harness import (
+    AgentCapabilityResolver,
     AgentExecutionResult,
     AgentRegistry,
     AgentRuntime,
@@ -46,10 +47,11 @@ from congeries_core.provider.model import (
     ModelSelector,
     ModelUsage,
 )
+from congeries_core.runtime import CapabilityRef
 from congeries_core.runtime.content import ContentBlock, ContentKind
 from congeries_core.runtime.control import Deadline
 from congeries_core.runtime.errors import CoreError, ErrorCategory, ErrorDetail
-from congeries_core.runtime.ids import ModelId, ProviderId, RunId
+from congeries_core.runtime.ids import ModelId, ProviderId, ResourceId, RunId
 from congeries_core.runtime.run import (
     AgentRun,
     AuditFailureMode,
@@ -113,6 +115,35 @@ class RuntimeFixture:
     events: ProviderEventRecorder
 
 
+@dataclass(slots=True)
+class RecordingCapabilityResolver:
+    fail: bool = False
+    skill_calls: list[CapabilityRef] = field(default_factory=list)
+    tool_calls: list[CapabilityRef] = field(default_factory=list)
+
+    def validate_skill(self, ref: CapabilityRef) -> None:
+        self.skill_calls.append(ref)
+        if self.fail:
+            raise CoreError(
+                ErrorDetail(
+                    ErrorCategory.VERSION_MISMATCH,
+                    "skill_contract_version_mismatch",
+                    "Skill contract version is unsupported",
+                )
+            )
+
+    def validate_tool(self, ref: CapabilityRef) -> None:
+        self.tool_calls.append(ref)
+        if self.fail:
+            raise CoreError(
+                ErrorDetail(
+                    ErrorCategory.VERSION_MISMATCH,
+                    "tool_contract_version_mismatch",
+                    "Tool contract version is unsupported",
+                )
+            )
+
+
 async def runtime_fixture(
     *,
     policy: RecordingPolicy | None = None,
@@ -123,6 +154,9 @@ async def runtime_fixture(
     events: ProviderEventRecorder | None = None,
     audit_failure_mode: AuditFailureMode = AuditFailureMode.PAUSE,
     fail_audit: bool = False,
+    skill_refs: tuple[CapabilityRef, ...] = (),
+    tool_refs: tuple[CapabilityRef, ...] = (),
+    capabilities: AgentCapabilityResolver | None = None,
 ) -> RuntimeFixture:
     run = replace(agent_run(), control_policy=RunControlPolicy(audit_failure_mode))
     transitions = TransitionRecorder()
@@ -232,6 +266,8 @@ async def runtime_fixture(
         (ContentBlock.text("Be helpful"),),
         context_binding,
         model_binding,
+        skill_refs,
+        tool_refs,
     )
     agents = AgentRegistry()
     agents.register(spec)
@@ -242,6 +278,7 @@ async def runtime_fixture(
             models=models,
             runs=runs,
             clock=FixedClock(),
+            capabilities=capabilities,
         ),
         runs,
         run,
@@ -565,3 +602,44 @@ def test_agent_registry_and_execution_value_validation() -> None:
         AgentExecutionResult(run)
     with pytest.raises(CoreError):
         registry.get(run.agent_id, replace(run.definition_id, value="missing"))
+
+
+@pytest.mark.asyncio
+async def test_agent_capability_preflight_precedes_run_and_provider_effects() -> None:
+    skill_ref = CapabilityRef(
+        "core", "skill", ResourceId("test.skill"), "test.plugin", "1"
+    )
+    tool_ref = CapabilityRef(
+        "core", "tool", ResourceId("test.tool"), "test.plugin", "1"
+    )
+    failing = RecordingCapabilityResolver(fail=True)
+    fixture = await runtime_fixture(
+        skill_refs=(skill_ref,), tool_refs=(tool_ref,), capabilities=failing
+    )
+    context = call_context(run_id=fixture.run.run_id, scope=fixture.run.scope)
+
+    with pytest.raises(CoreError) as error:
+        await fixture.runtime.execute(
+            fixture.run.run_id, (ContentBlock.text("Hi"),), context
+        )
+
+    assert error.value.detail.code == "skill_contract_version_mismatch"
+    loaded = await fixture.runs.get(fixture.run.run_id)
+    assert loaded.status is RunStatus.CREATED
+    assert fixture.transitions.transitions == []
+    assert fixture.context_provider.capability_calls == 0
+    assert fixture.model_provider.capability_calls == 0
+    assert failing.skill_calls == [skill_ref]
+    assert failing.tool_calls == []
+
+    valid = RecordingCapabilityResolver()
+    success = await runtime_fixture(
+        skill_refs=(skill_ref,), tool_refs=(tool_ref,), capabilities=valid
+    )
+    success_context = call_context(run_id=success.run.run_id, scope=success.run.scope)
+    result = await success.runtime.execute(
+        success.run.run_id, (ContentBlock.text("Hi"),), success_context
+    )
+    assert result.run.status is RunStatus.SUCCEEDED
+    assert valid.skill_calls == [skill_ref]
+    assert valid.tool_calls == [tool_ref]

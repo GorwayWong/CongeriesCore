@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from typing import Protocol
 
 from congeries_core.policy.authorization import ResourceRef
 from congeries_core.provider.context import (
@@ -18,6 +19,7 @@ from congeries_core.provider.model import (
     ModelRequest,
     ModelResponse,
 )
+from congeries_core.runtime.capability import CapabilityRef
 from congeries_core.runtime.content import ContentBlock
 from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import Clock
@@ -40,33 +42,72 @@ class AgentSpec:
     instructions: tuple[ContentBlock, ...]
     context_binding: ContextBinding
     model_binding: ModelBinding
-    skill_refs: tuple[ResourceRef, ...] = field(default_factory=tuple)
-    tool_refs: tuple[ResourceRef, ...] = field(default_factory=tuple)
+    skill_refs: tuple[CapabilityRef | ResourceRef, ...] = field(default_factory=tuple)
+    tool_refs: tuple[CapabilityRef | ResourceRef, ...] = field(default_factory=tuple)
     policy_ref: ResourceRef | None = None
+    contract_version: str = "1"
 
     def __post_init__(self) -> None:
+        if self.contract_version not in {"1", "2"}:
+            raise ValueError("AgentSpec contract version is unsupported")
         if not self.instructions:
             raise ValueError("AgentSpec instructions must not be empty")
         if len({item.key for item in self.skill_refs}) != len(self.skill_refs):
             raise ValueError("AgentSpec skill references must be unique")
         if len({item.key for item in self.tool_refs}) != len(self.tool_refs):
             raise ValueError("AgentSpec tool references must be unique")
+        if any(item.kind != "skill" for item in self.skill_refs):
+            raise ValueError("AgentSpec skill reference kind must be skill")
+        if any(item.kind != "tool" for item in self.tool_refs):
+            raise ValueError("AgentSpec tool reference kind must be tool")
+        if self.contract_version == "2" and any(
+            not isinstance(item, CapabilityRef)
+            for item in (*self.skill_refs, *self.tool_refs)
+        ):
+            raise ValueError("AgentSpec v2 requires versioned capability references")
 
     def to_data(self) -> dict[str, object]:
-        return {
+        data: dict[str, object] = {
             "agent_id": self.agent_id.value,
             "definition_id": self.definition_id.value,
             "instructions": [item.to_data() for item in self.instructions],
-            "skill_refs": [item.to_data() for item in self.skill_refs],
-            "tool_refs": [item.to_data() for item in self.tool_refs],
+            "skill_refs": [self._reference_data(item) for item in self.skill_refs],
+            "tool_refs": [self._reference_data(item) for item in self.tool_refs],
             "context_binding": self.context_binding.to_data(),
             "policy_ref": self.policy_ref.to_data() if self.policy_ref else None,
             "model_binding": self.model_binding.to_data(),
         }
+        if self.contract_version == "2":
+            return {"contract_version": "2", **data}
+        return data
 
     @classmethod
     def from_data(cls, data: dict[str, object]) -> AgentSpec:
+        contract_version = str(data.get("contract_version", "1"))
+        expected = {
+            "agent_id",
+            "definition_id",
+            "instructions",
+            "skill_refs",
+            "tool_refs",
+            "context_binding",
+            "policy_ref",
+            "model_binding",
+        }
+        if contract_version == "2":
+            expected.add("contract_version")
+        if set(data) != expected:
+            raise ValueError("AgentSpec fields are invalid")
         raw_policy = data.get("policy_ref")
+
+        def parse_ref(item: dict[str, object]) -> CapabilityRef | ResourceRef:
+            # v1 must keep the original ResourceRef representation, including an
+            # optional owner, so reading and writing a legacy fixture is byte-exact.
+            # Only v2 promises the stronger, versioned CapabilityRef contract.
+            if contract_version == "2":
+                return CapabilityRef.from_data(item)
+            return ResourceRef.from_data(item)
+
         return cls(
             agent_id=AgentId(str(data["agent_id"])),
             definition_id=DefinitionId(str(data["definition_id"])),
@@ -75,11 +116,11 @@ class AgentSpec:
                 for item in as_array(data["instructions"], "Agent instructions")
             ),
             skill_refs=tuple(
-                ResourceRef.from_data(as_object(item, "Skill reference"))
+                parse_ref(as_object(item, "Skill reference"))
                 for item in as_array(data["skill_refs"], "Skill references")
             ),
             tool_refs=tuple(
-                ResourceRef.from_data(as_object(item, "Tool reference"))
+                parse_ref(as_object(item, "Tool reference"))
                 for item in as_array(data["tool_refs"], "Tool references")
             ),
             context_binding=ContextBinding.from_data(
@@ -93,7 +134,41 @@ class AgentSpec:
             model_binding=ModelBinding.from_data(
                 as_object(data["model_binding"], "Model binding")
             ),
+            contract_version=contract_version,
         )
+
+    def upgrade_v2(self) -> AgentSpec:
+        def upgrade(ref: CapabilityRef | ResourceRef) -> CapabilityRef:
+            if isinstance(ref, CapabilityRef):
+                return ref
+            # Migration is explicit because an ownerless legacy reference has no
+            # deterministic Plugin registration to name in the v2 wire contract.
+            return CapabilityRef.from_resource(ref, contract_version="1")
+
+        return replace(
+            self,
+            skill_refs=tuple(upgrade(item) for item in self.skill_refs),
+            tool_refs=tuple(upgrade(item) for item in self.tool_refs),
+            contract_version="2",
+        )
+
+    def _reference_data(self, ref: CapabilityRef | ResourceRef) -> dict[str, object]:
+        if self.contract_version == "1":
+            data = (
+                ref.resource.to_data()
+                if isinstance(ref, CapabilityRef)
+                else ref.to_data()
+            )
+            return {key: value for key, value in data.items()}
+        if not isinstance(ref, CapabilityRef):
+            raise AssertionError("AgentSpec v2 contains an unversioned reference")
+        return {key: value for key, value in ref.to_data().items()}
+
+
+class AgentCapabilityResolver(Protocol):
+    def validate_skill(self, ref: CapabilityRef) -> None: ...
+
+    def validate_tool(self, ref: CapabilityRef) -> None: ...
 
 
 class AgentRegistry:
@@ -179,12 +254,14 @@ class AgentRuntime:
         models: ModelGateway,
         runs: RunService,
         clock: Clock,
+        capabilities: AgentCapabilityResolver | None = None,
     ) -> None:
         self._agents = agents
         self._contexts = contexts
         self._models = models
         self._runs = runs
         self._clock = clock
+        self._capabilities = capabilities
 
     async def execute(
         self,
@@ -213,16 +290,21 @@ class AgentRuntime:
                 "minimal Agent execution requires a CREATED AgentRun",
             )
 
+        spec = self._agents.get(loaded.agent_id, loaded.definition_id)
+        if spec.model_binding.ref != loaded.model_binding_ref:
+            raise core_error(
+                ErrorCategory.INVALID_REQUEST,
+                "agent_model_binding_mismatch",
+                "AgentRun model binding does not match AgentSpec",
+            )
+        # This is a static reference preflight: it deliberately runs before the
+        # first Run transition or Context/Model provider effect. It validates
+        # registrations only; it does not load Skill content or execute Tools.
+        self._validate_capabilities(spec)
+
         current = loaded
         try:
             context.check_active(self._clock)
-            spec = self._agents.get(loaded.agent_id, loaded.definition_id)
-            if spec.model_binding.ref != loaded.model_binding_ref:
-                raise core_error(
-                    ErrorCategory.INVALID_REQUEST,
-                    "agent_model_binding_mismatch",
-                    "AgentRun model binding does not match AgentSpec",
-                )
             current = await self._runs.start(run_id, current.state_version)
             current = await self._runs.advance(
                 run_id, current.state_version, RunStatus.CONTEXT_LOADING
@@ -297,7 +379,10 @@ class AgentRuntime:
                     input=input,
                     instructions=spec.instructions,
                     context_entries=context_entries,
-                    tools=spec.tool_refs,
+                    tools=tuple(
+                        item.resource if isinstance(item, CapabilityRef) else item
+                        for item in spec.tool_refs
+                    ),
                     policy=spec.model_binding.default_policy,
                     budget=spec.model_binding.default_budget,
                 )
@@ -317,6 +402,33 @@ class AgentRuntime:
             "model_binding_unavailable",
             "no ModelProvider binding is available",
         )
+
+    def _validate_capabilities(self, spec: AgentSpec) -> None:
+        if not spec.skill_refs and not spec.tool_refs:
+            return
+        if self._capabilities is None:
+            raise core_error(
+                ErrorCategory.UNAVAILABLE,
+                "agent_capability_resolver_unavailable",
+                "AgentSpec capabilities require a Skill/Tool resolver",
+                retryable=True,
+            )
+        for ref in spec.skill_refs:
+            self._capabilities.validate_skill(self._versioned_ref(ref))
+        for ref in spec.tool_refs:
+            self._capabilities.validate_tool(self._versioned_ref(ref))
+
+    def _versioned_ref(self, ref: CapabilityRef | ResourceRef) -> CapabilityRef:
+        if isinstance(ref, CapabilityRef):
+            return ref
+        try:
+            return CapabilityRef.from_resource(ref, contract_version="1")
+        except ValueError as error:
+            raise core_error(
+                ErrorCategory.INVALID_REQUEST,
+                "agent_capability_owner_required",
+                "Agent capability resolution requires an owning extension",
+            ) from error
 
     async def _terminalize(self, run_id: RunId, error: ErrorDetail) -> AgentRun:
         for _ in range(2):

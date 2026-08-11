@@ -1,0 +1,11 @@
+{
+  "skill": {
+    "namespace": "core",
+    "kind": "skill",
+    "id": "test.capabilities.skill",
+    "owning_extension": "test.capabilities",
+    "contract_version": "1"
+  },
+  "resource_id": "guide",
+  "max_bytes": 64
+}

@@ -2,9 +2,16 @@
 
 from congeries_core.evaluation import EvaluationHarness, SchemaEvaluator
 
-from .agent import AgentExecutionResult, AgentRegistry, AgentRuntime, AgentSpec
+from .agent import (
+    AgentCapabilityResolver,
+    AgentExecutionResult,
+    AgentRegistry,
+    AgentRuntime,
+    AgentSpec,
+)
 
 __all__ = [
+    "AgentCapabilityResolver",
     "AgentExecutionResult",
     "AgentRegistry",
     "AgentRuntime",

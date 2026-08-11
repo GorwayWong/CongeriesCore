@@ -7,7 +7,7 @@
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
 - Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md), [RFC-0012](RFC-0012-evaluation.md)
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md), [RFC-0012](RFC-0012-evaluation.md), [RFC-0013](RFC-0013-skill-tool-contracts.md)
 - Supersedes: Security and isolation portions of the legacy RFC-0006 draft
 
 ## 1. Scope
@@ -182,7 +182,8 @@ A conforming implementation demonstrates:
 ## 11. Implemented Capability Coverage
 
 The Implemented status covers the common AuthorizedDispatcher boundary and all
-v0.2 capability paths that currently exist: ContextProvider capability and
+v0.2 capability paths that currently exist: Skill resource reads, Tool
+invocations, ContextProvider capability and
 provide calls, MemoryProvider capability and operation calls, ModelProvider
 capability, generate, and stream calls, CheckpointStore save, load, list, and
 delete calls, approval decisions, and EventSink dispatch. Their non-bypass,
@@ -190,6 +191,7 @@ default-deny, unknown-action, constraint, cross-scope audit, deadline,
 cancellation, and audit-failure behavior is covered by contract or integration
 tests.
 
-Tool, general StorageProvider, and MCP contracts are not implemented by this status.
+General StorageProvider and MCP contracts are not implemented by this status.
 Each future capability must register versioned actions and reuse this boundary
-before its own delivery task may be marked Implemented.
+before its own delivery task may be marked Implemented. Skill and Tool grant
+constraints and execution order are defined by RFC-0013.

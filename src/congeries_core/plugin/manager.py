@@ -30,6 +30,7 @@ from .dependency import (
 )
 from .errors import plugin_error
 from .events import NullPluginEventPublisher, PluginEventPublisher
+from .invocation import PluginCapabilityInvoker
 from .lifecycle import PluginLifecycleController, PluginStateRecord
 from .loader import PluginLoader, PreparedPlugin
 from .manifest import ManifestValidator, PluginPreflight
@@ -42,6 +43,7 @@ from .model import (
 )
 from .registry import (
     CapabilityKey,
+    CapabilityRegistration,
     CapabilityRegistrationPlan,
     CapabilityRegistry,
 )
@@ -89,6 +91,12 @@ class PluginManager:
         self._dispatcher = dispatcher
         self._clock = clock
         self._events = events or NullPluginEventPublisher()
+        self._invoker = PluginCapabilityInvoker(
+            registry=registry,
+            lifecycle=lifecycle,
+            dispatcher=dispatcher,
+            clock=clock,
+        )
         self._prepared: dict[str, tuple[PreparedPlugin, PluginLoader]] = {}
         self._operation_locks: dict[str, asyncio.Lock] = {}
 
@@ -187,74 +195,25 @@ class PluginManager:
         principal: RuntimePrincipal,
         operation: CapabilityOperation[ResultT],
     ) -> ResultT:
-        registration = self._registry.get(capability_key)
-        if registration.owner.name != plugin_id:
-            raise plugin_error(
-                ErrorCategory.CONFLICT,
-                "registration_identity_conflict",
-                "Capability is owned by another Plugin",
-                plugin=plugin_id,
-                capability=capability_key[1],
-            )
-        permission = next(
-            (
-                item
-                for item in registration.declaration.permissions
-                if item.action.key == action.key
-            ),
-            None,
-        )
-        if permission is None:
-            raise plugin_error(
-                ErrorCategory.DENIED,
-                "permission_denied",
-                "Capability invocation action is not declared",
-                plugin=plugin_id,
-                capability=capability_key[1],
-            )
+        async def adapted(
+            registration: CapabilityRegistration, call: AuthorizedCall
+        ) -> ResultT:
+            return await operation(registration.implementation, call.context)
 
-        async def authorized(call: AuthorizedCall) -> object:
-            # Policy authorization and the manifest's Scope declaration are both
-            # gates. Acquire only after they pass, then release in finally so
-            # success, provider failure, timeout, and cancellation are symmetric.
-            if not permission.permits(call.context.scope):
-                raise plugin_error(
-                    ErrorCategory.DENIED,
-                    "permission_denied",
-                    "Capability invocation Scope is outside its declaration",
-                    plugin=plugin_id,
-                    capability=capability_key[1],
-                )
-            lease = await self._lifecycle.acquire(
-                plugin_id,
-                capability_key,
-                call.context,
-            )
-            try:
-                return await await_provider(
-                    operation(registration.implementation, call.context),
-                    call.context,
-                    self._clock,
-                )
-            finally:
-                await self._lifecycle.release(lease)
-
-        result = await self._dispatcher.dispatch(
-            AccessRequest(
-                principal=principal,
-                action=action,
-                resource=ResourceRef(
-                    "core",
-                    registration.declaration.type.value,
-                    ResourceId(registration.declaration.capability_id),
-                    owning_extension=plugin_id,
-                ),
-                scope=context.scope,
-                context=context,
+        return await self._invoker.invoke(
+            plugin_id=plugin_id,
+            capability_key=capability_key,
+            action=action,
+            resource=ResourceRef(
+                "core",
+                capability_key[0],
+                ResourceId(capability_key[1]),
+                owning_extension=plugin_id,
             ),
-            authorized,
+            context=context,
+            principal=principal,
+            operation=adapted,
         )
-        return cast(ResultT, result)
 
     async def _load_effect(
         self,
@@ -800,13 +759,13 @@ class PluginManager:
                         scope=context.scope,
                         context=context,
                     ),
-                    lambda call,
-                    requested=permission,
-                    capability=capability_id: self._allow_declared_permission(
-                        requested,
-                        manifest.name,
-                        capability,
-                        call,
+                    lambda call, requested=permission, capability=capability_id: (
+                        self._allow_declared_permission(
+                            requested,
+                            manifest.name,
+                            capability,
+                            call,
+                        )
                     ),
                 )
             except CoreError as error:

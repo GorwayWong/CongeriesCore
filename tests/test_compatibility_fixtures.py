@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import cast
 
+import pytest
+
 from congeries_core.checkpoint import (
     ApprovalCheckpointState,
     Checkpoint,
@@ -32,6 +34,18 @@ from congeries_core.provider.memory import (
 from congeries_core.provider.model import ModelBinding
 from congeries_core.runtime.content import ContentBlock
 from congeries_core.runtime.json_types import as_array, as_object
+from congeries_core.skill import (
+    SkillDescriptor,
+    SkillResource,
+    SkillResourceRequest,
+    skill_actions,
+)
+from congeries_core.tool import (
+    ToolCall,
+    ToolDescriptor,
+    ToolResult,
+    tool_actions,
+)
 from congeries_core.workflow import (
     WorkflowContext,
     WorkflowDefinition,
@@ -75,6 +89,28 @@ def test_content_context_model_and_agent_spec_v02_fixtures() -> None:
     agent = AgentSpec.from_data(agent_data)
     assert AgentSpec.from_data(agent.to_data()) == agent
     assert _serialized(agent.to_data()) == _text("agent_spec.json")
+    upgraded = agent.upgrade_v2()
+    assert upgraded.contract_version == "2"
+    assert upgraded.to_data()["contract_version"] == "2"
+
+    agent_v2 = AgentSpec.from_data(_object("agent_spec_v2.json"))
+    assert agent_v2.contract_version == "2"
+    assert AgentSpec.from_data(agent_v2.to_data()) == agent_v2
+    assert _serialized(agent_v2.to_data()) == _text("agent_spec_v2.json")
+
+    legacy_unowned = _object("agent_spec.json")
+    legacy_unowned["skill_refs"] = [
+        {
+            "namespace": "core",
+            "kind": "skill",
+            "id": "legacy.skill",
+            "owning_extension": None,
+        }
+    ]
+    decoded_unowned = AgentSpec.from_data(legacy_unowned)
+    assert decoded_unowned.to_data() == legacy_unowned
+    with pytest.raises(ValueError, match="owning extension"):
+        decoded_unowned.upgrade_v2()
 
 
 def test_memory_v02_fixture_round_trips_exactly() -> None:
@@ -224,3 +260,28 @@ def test_plugin_v1_manifest_action_and_event_fixtures_round_trip_exactly() -> No
         CoreEventType.PLUGIN_LIFECYCLE_FAILED.value,
     ]
     assert _serialized(event_values) == _text("plugin_events.json")
+
+
+def test_skill_and_tool_v1_fixtures_round_trip_exactly() -> None:
+    for name, contract in (
+        ("skill_descriptor.json", SkillDescriptor),
+        ("skill_resource_request.json", SkillResourceRequest),
+        ("skill_resource.json", SkillResource),
+        ("tool_descriptor.json", ToolDescriptor),
+        ("tool_call.json", ToolCall),
+        ("tool_result.json", ToolResult),
+    ):
+        value = contract.from_data(_object(name))
+        assert contract.from_data(value.to_data()) == value
+        assert _serialized(value.to_data()) == _text(name)
+
+    for name, expected in (
+        ("skill_actions.json", skill_actions()),
+        ("tool_actions.json", tool_actions()),
+    ):
+        values = as_array(json.loads(_text(name)), name)
+        actions = tuple(
+            ActionRef.from_data(as_object(item, "Skill/Tool action")) for item in values
+        )
+        assert actions == expected
+        assert _serialized([action.to_data() for action in actions]) == _text(name)

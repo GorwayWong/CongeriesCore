@@ -1,5 +1,6 @@
 """Shared runtime identities, context, errors, and execution models."""
 
+from .capability import CapabilityRef
 from .codec import dumps, loads
 from .content import ContentBlock, ContentKind
 from .context import RuntimeCallContext, SessionRef
@@ -46,6 +47,7 @@ __all__ = [
     "AttemptOutcome",
     "AuditFailureMode",
     "CancellationToken",
+    "CapabilityRef",
     "CheckpointRef",
     "ContentBlock",
     "ContentKind",

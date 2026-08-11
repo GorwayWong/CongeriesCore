@@ -59,7 +59,9 @@ Agent = Identity
 ```
 
 AgentSpec references registered capabilities and a vendor-neutral ModelProvider
-binding. It does not contain provider implementation objects.
+binding. Legacy v1 ResourceRef values remain compatible; AgentSpec v2 uses exact
+versioned CapabilityRef values. It does not contain provider implementation
+objects.
 
 AgentRegistry resolves an exact Agent and definition identity. The minimal
 direct Agent Runtime validates Run, AgentSpec, binding, Scope, Workspace, and
@@ -79,7 +81,23 @@ timeout, unavailable, malformed, and unacceptable partial results map to FAILED.
 A reliable audit failure preserves the PAUSED or policy-selected FAILED state
 already committed by RunService.
 
-### 3.2 Workflow
+SkillToolResolver preflights all declared Skill and Tool references before Run,
+Context, or Model effects. The direct Agent runtime neither loads Skill content
+nor executes Tool proposals.
+
+### 3.2 Skill and Tool
+
+SkillRegistry and ToolRegistry are typed read-only views over the same atomic
+Plugin capability snapshot. Skill metadata discovery is pure. Skill resources
+load one named resource through authorization and one owning Plugin lease. Tool
+calls validate input Schema before authorization, execute all allowed retries
+under one lease and stable operation identity, then validate output Schema before
+release. Loaders and executors never escape the leased invocation callback.
+
+The normative contract is
+[RFC-0013](docs/rfcs/RFC-0013-skill-tool-contracts.md).
+
+### 3.3 Workflow
 
 Workflow is an executable graph:
 

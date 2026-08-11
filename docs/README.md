@@ -102,6 +102,7 @@ with relative links to the owning document.
 
 - [Evaluation Pipeline Code Review Guide](reviews/evaluation-pipeline-code-review.md)
 - [Plugin v1 Code Review Guide](reviews/plugin-v1-code-review.md)
+- [Skill and Tool v1 Code Review Guide](reviews/task-5.2-skill-tool-code-review.md)
 
 ## Legacy Migration Pages
 

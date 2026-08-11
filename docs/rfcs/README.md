@@ -20,6 +20,7 @@ semantics and metadata requirements are defined in the
 | [RFC-0010](RFC-0010-runtime-events.md) | Runtime Events | Implemented |
 | [RFC-0011](RFC-0011-checkpoint-recovery.md) | Checkpoint and Recovery | Implemented |
 | [RFC-0012](RFC-0012-evaluation.md) | Evaluation | Implemented |
+| [RFC-0013](RFC-0013-skill-tool-contracts.md) | Skill and Tool Contracts | Implemented |
 
 RFC files use lowercase kebab-case after the permanent uppercase identifier.
 New RFCs take the next unused identifier.
