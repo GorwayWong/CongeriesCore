@@ -41,10 +41,9 @@ class ToolExecutionPolicy:
     max_attempts: int = 1
 
     def __post_init__(self) -> None:
-        if self.timeout_ms is not None and self.timeout_ms < 1:
-            raise ValueError("Tool timeout_ms must be positive")
-        if self.max_attempts < 1:
-            raise ValueError("Tool max_attempts must be positive")
+        if self.timeout_ms is not None:
+            _require_positive_int(self.timeout_ms, "Tool timeout_ms")
+        _require_positive_int(self.max_attempts, "Tool max_attempts")
 
     def to_data(self) -> dict[str, object]:
         return {"timeout_ms": self.timeout_ms, "max_attempts": self.max_attempts}
@@ -179,8 +178,7 @@ class ToolResult:
         ):
             raise ValueError("Tool result requires a Tool v1 reference")
         object.__setattr__(self, "output", as_json_value(self.output, "Tool output"))
-        if self.attempts < 1:
-            raise ValueError("Tool result attempts must be positive")
+        _require_positive_int(self.attempts, "Tool result attempts")
         _require_text(self.operation_identity, "Tool operation identity")
 
     def to_data(self) -> dict[str, object]:
@@ -218,3 +216,8 @@ class ToolImplementation:
 def _require_text(value: str, name: str) -> None:
     if not value or value != value.strip():
         raise ValueError(f"{name} must be non-empty and trimmed")
+
+
+def _require_positive_int(value: object, name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{name} must be a positive integer")

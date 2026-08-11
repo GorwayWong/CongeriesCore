@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
+from typing import cast
 
 import pytest
 
@@ -19,14 +20,16 @@ from congeries_core.plugin import (
     RegistrationReceipt,
 )
 from congeries_core.policy.authorization import (
+    AccessRequest,
     ActionRegistry,
     AuthorizedDispatcher,
     CorePrincipalKind,
+    PolicyDecision,
     ResourceRef,
     RuntimePrincipal,
 )
 from congeries_core.runtime import CapabilityRef
-from congeries_core.runtime.content import ContentBlock
+from congeries_core.runtime.content import ContentBlock, ContentKind
 from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import Deadline
 from congeries_core.runtime.errors import CoreError, ErrorCategory, core_error
@@ -54,6 +57,7 @@ from congeries_core.tool import (
     ToolIdempotencyMode,
     ToolImplementation,
     ToolRegistry,
+    ToolResult,
     ToolSideEffect,
     tool_actions,
 )
@@ -194,8 +198,35 @@ class BlockingToolExecutor(FakeToolExecutor):
         raise AssertionError("unreachable")
 
 
+@dataclass(slots=True)
+class GateToolExecutor(FakeToolExecutor):
+    entered: asyncio.Event = field(default_factory=asyncio.Event)
+    release: asyncio.Event = field(default_factory=asyncio.Event)
+
+    async def execute(self, call: ToolCall, context: RuntimeCallContext) -> JsonValue:
+        assert context.idempotency_key is not None
+        self.calls.append(context.idempotency_key.value)
+        self.entered.set()
+        await self.release.wait()
+        assert isinstance(call.input, dict)
+        return {"ok": call.input["value"]}
+
+
+@dataclass(slots=True)
+class BlockingPolicy(RecordingPolicy):
+    entered: asyncio.Event = field(default_factory=asyncio.Event)
+
+    async def authorize(self, request: AccessRequest) -> PolicyDecision:
+        self.requests.append(request)
+        self.entered.set()
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+
 type TestSkillLoader = FakeSkillLoader | AlternateSkillLoader | BlockingSkillLoader
-type TestToolExecutor = FakeToolExecutor | AlternateToolExecutor | BlockingToolExecutor
+type TestToolExecutor = (
+    FakeToolExecutor | AlternateToolExecutor | BlockingToolExecutor | GateToolExecutor
+)
 
 
 @dataclass(slots=True)
@@ -217,6 +248,9 @@ class ContractRuntime:
 async def runtime(
     loader_type: type[TestSkillLoader] = FakeSkillLoader,
     executor_type: type[TestToolExecutor] = FakeToolExecutor,
+    *,
+    policy: RecordingPolicy | None = None,
+    tool_timeout_ms: int | None = 1_000,
 ) -> ContractRuntime:
     clock = FixedClock()
     registry = CapabilityRegistry()
@@ -225,7 +259,7 @@ async def runtime(
     schemas.register(INPUT_SCHEMA, ObjectWithValue())
     schemas.register(OUTPUT_SCHEMA, ObjectWithOk())
     actions = ActionRegistry((*skill_actions(), *tool_actions()))
-    policy = RecordingPolicy()
+    policy = policy or RecordingPolicy()
     dispatcher: AuthorizedDispatcher[object] = AuthorizedDispatcher(
         action_registry=actions,
         audit_publisher=AuditRecorder(),
@@ -296,7 +330,7 @@ async def runtime(
             INPUT_SCHEMA,
             OUTPUT_SCHEMA,
             TOOL_EXECUTE_ACTION,
-            ToolExecutionPolicy(timeout_ms=1_000, max_attempts=2),
+            ToolExecutionPolicy(timeout_ms=tool_timeout_ms, max_attempts=2),
             ToolSideEffect.EXTERNAL,
             ToolIdempotencyMode.CALLER_KEY,
         ),
@@ -406,6 +440,23 @@ def test_models_are_strict_immutable_and_round_trip() -> None:
             ToolSideEffect.EXTERNAL,
             ToolIdempotencyMode.NOT_APPLICABLE,
         )
+    for invalid_budget in (True, cast(int, 1.5)):
+        with pytest.raises(ValueError, match="positive integer"):
+            SkillResourceDescriptor(
+                ResourceId("invalid-budget"),
+                SkillResourceKind.REFERENCE,
+                "invalid.txt",
+                "text/plain",
+                invalid_budget,
+            )
+        with pytest.raises(ValueError, match="positive integer"):
+            SkillResourceRequest(SKILL_REF, ResourceId("guide"), invalid_budget)
+        with pytest.raises(ValueError, match="positive integer"):
+            ToolExecutionPolicy(timeout_ms=invalid_budget)
+        with pytest.raises(ValueError, match="positive integer"):
+            ToolExecutionPolicy(max_attempts=invalid_budget)
+        with pytest.raises(ValueError, match="positive integer"):
+            ToolResult(TOOL_REF, {"ok": "value"}, invalid_budget, "operation")
 
 
 @pytest.mark.asyncio
@@ -443,6 +494,62 @@ async def test_skill_denial_and_invalid_budget_precede_loader_effects() -> None:
             SkillResourceRequest(SKILL_REF, ResourceId("guide"), 65), call_context()
         )
     assert fixture.loader.calls == []
+
+
+@pytest.mark.asyncio
+async def test_skill_and_tool_require_identity_and_skill_failures_release_lease() -> (
+    None
+):
+    fixture = await runtime()
+    missing_identity = replace(call_context(), idempotency_key=None)
+    with pytest.raises(CoreError) as missing_skill:
+        await fixture.skill_gateway.load(
+            SkillResourceRequest(SKILL_REF, ResourceId("guide"), 64),
+            missing_identity,
+        )
+    assert missing_skill.value.detail.code == "missing_invocation_identity"
+    with pytest.raises(CoreError) as missing_tool:
+        await fixture.tool_gateway.execute(
+            ToolCall(TOOL_REF, {"value": "x"}), missing_identity
+        )
+    assert missing_tool.value.detail.code == "missing_invocation_identity"
+
+    with pytest.raises(CoreError) as undeclared:
+        await fixture.skill_gateway.load(
+            SkillResourceRequest(SKILL_REF, ResourceId("missing"), 64), call_context()
+        )
+    assert undeclared.value.detail.code == "skill_resource_undeclared"
+    assert fixture.loader.calls == []
+
+    fixture.policy.constraints = {"unknown": True}
+    with pytest.raises(CoreError) as invalid_grant:
+        await fixture.skill_gateway.load(
+            SkillResourceRequest(SKILL_REF, ResourceId("guide"), 64), call_context()
+        )
+    assert invalid_grant.value.detail.code == "invalid_grant"
+    assert await fixture.lifecycle.active_lease_count("test.capabilities") == 0
+
+    oversized = await runtime()
+    assert isinstance(oversized.loader, FakeSkillLoader)
+    oversized.loader.result = ContentBlock.text("x" * 65)
+    with pytest.raises(CoreError) as budget:
+        await oversized.skill_gateway.load(
+            SkillResourceRequest(SKILL_REF, ResourceId("guide"), 64), call_context()
+        )
+    assert budget.value.detail.code == "skill_resource_budget_exceeded"
+    assert await oversized.lifecycle.active_lease_count("test.capabilities") == 0
+
+    wrong_media = await runtime()
+    assert isinstance(wrong_media.loader, FakeSkillLoader)
+    wrong_media.loader.result = ContentBlock(
+        ContentKind.TEXT, "guide", media_type="text/markdown"
+    )
+    with pytest.raises(CoreError) as protocol:
+        await wrong_media.skill_gateway.load(
+            SkillResourceRequest(SKILL_REF, ResourceId("guide"), 64), call_context()
+        )
+    assert protocol.value.detail.code == "skill_protocol_failure"
+    assert await wrong_media.lifecycle.active_lease_count("test.capabilities") == 0
 
 
 @pytest.mark.asyncio
@@ -491,6 +598,43 @@ async def test_tool_contract_retries_under_one_lease_with_stable_identity(
     assert all(
         "input" not in payload and "output" not in payload for payload in payloads
     )
+
+
+@pytest.mark.asyncio
+async def test_tool_whole_call_timeout_covers_authorization() -> None:
+    policy = BlockingPolicy()
+    fixture = await runtime(policy=policy, tool_timeout_ms=1)
+    with pytest.raises(CoreError) as timeout:
+        await fixture.tool_gateway.execute(
+            ToolCall(TOOL_REF, {"value": "wait"}), call_context()
+        )
+    assert timeout.value.detail.category is ErrorCategory.TIMEOUT
+    assert policy.entered.is_set()
+    assert fixture.executor.calls == []
+    assert await fixture.lifecycle.active_lease_count("test.capabilities") == 0
+
+
+@pytest.mark.asyncio
+async def test_concurrent_duplicate_tool_identity_has_one_effect() -> None:
+    fixture = await runtime(executor_type=GateToolExecutor)
+    assert isinstance(fixture.executor, GateToolExecutor)
+    context = replace(
+        call_context(), idempotency_key=IdempotencyKey("concurrent-operation")
+    )
+    first = asyncio.create_task(
+        fixture.tool_gateway.execute(ToolCall(TOOL_REF, {"value": "first"}), context)
+    )
+    await fixture.executor.entered.wait()
+    with pytest.raises(CoreError) as duplicate:
+        await fixture.tool_gateway.execute(
+            ToolCall(TOOL_REF, {"value": "second"}), context
+        )
+    assert duplicate.value.detail.code == "lease_identity_conflict"
+    fixture.executor.release.set()
+    result = await first
+    assert result.output == {"ok": "first"}
+    assert fixture.executor.calls == ["concurrent-operation"]
+    assert await fixture.lifecycle.active_lease_count("test.capabilities") == 0
 
 
 @pytest.mark.asyncio

@@ -47,6 +47,14 @@ class ExecutionLease:
     acquired_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class _InvocationReservation:
+    plugin_id: str
+    capability_key: CapabilityKey
+    run_id: RunId
+    invocation_identity: str
+
+
 _ALLOWED_TRANSITIONS: dict[PluginLifecycleState, frozenset[PluginLifecycleState]] = {
     PluginLifecycleState.DISCOVERED: frozenset({PluginLifecycleState.VALIDATED}),
     PluginLifecycleState.VALIDATED: frozenset({PluginLifecycleState.LOADED}),
@@ -70,6 +78,7 @@ class PluginLifecycleController:
         self._conditions: dict[str, asyncio.Condition] = {}
         self._leases: dict[str, dict[str, ExecutionLease]] = {}
         self._released: dict[str, set[str]] = {}
+        self._invocations: dict[str, dict[str, _InvocationReservation]] = {}
 
     async def discover(self, manifest: PluginManifest) -> PluginStateRecord:
         condition = self._conditions.setdefault(manifest.name, asyncio.Condition())
@@ -92,6 +101,7 @@ class PluginLifecycleController:
             self._records[manifest.name] = record
             self._leases[manifest.name] = {}
             self._released[manifest.name] = set()
+            self._invocations[manifest.name] = {}
             return record
 
     async def get(self, plugin_id: str) -> PluginStateRecord:
@@ -234,6 +244,48 @@ class PluginLifecycleController:
             )
             self._leases[plugin_id][invocation.value] = lease
             return lease
+
+    async def reserve_invocation(
+        self,
+        plugin_id: str,
+        capability_key: CapabilityKey,
+        context: RuntimeCallContext,
+    ) -> _InvocationReservation:
+        invocation = context.idempotency_key
+        if invocation is None:
+            raise plugin_error(
+                ErrorCategory.INVALID_REQUEST,
+                "missing_invocation_identity",
+                "Plugin capability invocation requires an idempotency key",
+                plugin=plugin_id,
+                capability=capability_key[1],
+            )
+        condition = self._condition(plugin_id)
+        async with condition:
+            if invocation.value in self._invocations[plugin_id]:
+                raise self._lease_conflict(plugin_id, capability_key[1])
+            reservation = _InvocationReservation(
+                plugin_id,
+                capability_key,
+                context.run_id,
+                invocation.value,
+            )
+            self._invocations[plugin_id][invocation.value] = reservation
+            return reservation
+
+    async def release_invocation(self, reservation: _InvocationReservation) -> None:
+        condition = self._condition(reservation.plugin_id)
+        async with condition:
+            existing = self._invocations[reservation.plugin_id].get(
+                reservation.invocation_identity
+            )
+            if existing != reservation:
+                raise self._lease_conflict(
+                    reservation.plugin_id, reservation.capability_key[1]
+                )
+            del self._invocations[reservation.plugin_id][
+                reservation.invocation_identity
+            ]
 
     async def release(self, lease: ExecutionLease) -> None:
         plugin_id = lease.plugin.name

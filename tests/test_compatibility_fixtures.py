@@ -97,6 +97,10 @@ def test_content_context_model_and_agent_spec_v02_fixtures() -> None:
     assert agent_v2.contract_version == "2"
     assert AgentSpec.from_data(agent_v2.to_data()) == agent_v2
     assert _serialized(agent_v2.to_data()) == _text("agent_spec_v2.json")
+    malformed_v2 = _object("agent_spec_v2.json")
+    malformed_v2["contract_version"] = 2
+    with pytest.raises(ValueError, match="must be a string"):
+        AgentSpec.from_data(malformed_v2)
 
     legacy_unowned = _object("agent_spec.json")
     legacy_unowned["skill_refs"] = [

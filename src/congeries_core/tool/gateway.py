@@ -68,6 +68,9 @@ class ToolGateway:
         resolved = self._tools.resolve(call.tool)
         descriptor = resolved.descriptor
         self._schemas.validate(descriptor.input_schema, call.input)
+        invocation_context = self._with_timeout(
+            context, descriptor.execution_policy.timeout_ms, started_at
+        )
         await self._emit(TOOL_INVOCATION_STARTED, context, self._payload(call, 0))
         constraints: Mapping[str, JsonValue] = {
             "input_schema": self._schema_identity(descriptor.input_schema),
@@ -127,7 +130,7 @@ class ToolGateway:
                 capability_key=call.tool.registration_key,
                 action=descriptor.action,
                 resource=call.tool.resource,
-                context=context,
+                context=invocation_context,
                 principal=RuntimePrincipal.core(
                     CorePrincipalKind.RUN, PrincipalId(context.run_id.value)
                 ),

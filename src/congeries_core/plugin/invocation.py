@@ -133,15 +133,25 @@ class PluginCapabilityInvoker:
             finally:
                 await self._lifecycle.release(lease)
 
-        result = await self._dispatcher.dispatch(
-            AccessRequest(
-                principal=principal,
-                action=action,
-                resource=resource,
-                scope=context.scope,
-                context=context,
-                constraints=constraints or {},
-            ),
-            authorized,
+        reservation = await self._lifecycle.reserve_invocation(
+            plugin_id, capability_key, context
         )
-        return cast(ResultT, result)
+        try:
+            result = await await_provider(
+                self._dispatcher.dispatch(
+                    AccessRequest(
+                        principal=principal,
+                        action=action,
+                        resource=resource,
+                        scope=context.scope,
+                        context=context,
+                        constraints=constraints or {},
+                    ),
+                    authorized,
+                ),
+                context,
+                self._clock,
+            )
+            return cast(ResultT, result)
+        finally:
+            await self._lifecycle.release_invocation(reservation)

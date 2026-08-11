@@ -83,7 +83,15 @@ class AgentSpec:
 
     @classmethod
     def from_data(cls, data: dict[str, object]) -> AgentSpec:
-        contract_version = str(data.get("contract_version", "1"))
+        raw_contract_version = data.get("contract_version")
+        if raw_contract_version is None:
+            contract_version = "1"
+        elif not isinstance(raw_contract_version, str):
+            raise ValueError("AgentSpec contract_version must be a string")
+        else:
+            contract_version = raw_contract_version
+        if contract_version not in {"1", "2"}:
+            raise ValueError("AgentSpec contract version is unsupported")
         expected = {
             "agent_id",
             "definition_id",

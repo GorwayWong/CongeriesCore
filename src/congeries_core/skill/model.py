@@ -42,8 +42,7 @@ class SkillResourceDescriptor:
     def __post_init__(self) -> None:
         _require_resource_path(self.path)
         _require_text(self.media_type, "Skill resource media type")
-        if self.max_bytes < 1:
-            raise ValueError("Skill resource max_bytes must be positive")
+        _require_positive_int(self.max_bytes, "Skill resource max_bytes")
 
     def to_data(self) -> dict[str, object]:
         return {
@@ -140,8 +139,7 @@ class SkillResourceRequest:
             or self.skill.contract_version != SKILL_CONTRACT_VERSION
         ):
             raise ValueError("Skill resource request requires a Skill v1 reference")
-        if self.max_bytes < 1:
-            raise ValueError("Skill resource request max_bytes must be positive")
+        _require_positive_int(self.max_bytes, "Skill resource request max_bytes")
 
     def to_data(self) -> dict[str, object]:
         return {
@@ -242,3 +240,8 @@ def _require_resource_path(value: str) -> None:
 def _require_text(value: str, name: str) -> None:
     if not value or value != value.strip():
         raise ValueError(f"{name} must be non-empty and trimmed")
+
+
+def _require_positive_int(value: object, name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{name} must be a positive integer")
