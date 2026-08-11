@@ -1,0 +1,127 @@
+{
+  "capabilities": {
+    "contract_version": "1",
+    "provider_id": "storage.test",
+    "max_artifact_bytes": 1024,
+    "supports_workspace_cas": true,
+    "supports_artifact_pagination": true
+  },
+  "workspace": {
+    "contract_version": "1",
+    "workspace_id": "workspace-1",
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "state_version": 0,
+    "values": {
+      "phase": "created"
+    },
+    "artifact_refs": []
+  },
+  "artifact_value": {
+    "record": {
+      "contract_version": "1",
+      "provider_id": "storage.test",
+      "artifact_id": "artifact-1",
+      "workspace_id": "workspace-1",
+      "scope": {
+        "namespace": "core",
+        "kind": "workspace",
+        "id": "workspace-1",
+        "parent": null
+      },
+      "media_type": "application/octet-stream",
+      "byte_length": 16,
+      "sha256": "42bd420cc2f99e68e60005fa7c28fc2f60e4e04ee160d9dd3b98e72fc2954f98",
+      "created_at": "2026-08-10T12:00:00+00:00",
+      "name": "result.bin",
+      "metadata": {
+        "safe": true
+      }
+    },
+    "content_base64": "YXJ0aWZhY3QgY29udGVudA=="
+  },
+  "artifact_reference": {
+    "contract_version": "1",
+    "provider_id": "storage.test",
+    "artifact_id": "artifact-1",
+    "workspace_id": "workspace-1",
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "sha256": "42bd420cc2f99e68e60005fa7c28fc2f60e4e04ee160d9dd3b98e72fc2954f98"
+  },
+  "artifact_query": {
+    "contract_version": "1",
+    "provider_id": "storage.test",
+    "workspace_id": "workspace-1",
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "limit": 2,
+    "cursor": {
+      "contract_version": "1",
+      "provider_id": "storage.test",
+      "workspace_id": "workspace-1",
+      "scope": {
+        "namespace": "core",
+        "kind": "workspace",
+        "id": "workspace-1",
+        "parent": null
+      },
+      "limit": 2,
+      "query_fingerprint": "6b0b5fec31c83539923fb051726005a540b6877f4d38d419ff4e420a8882e421",
+      "before_created_at": "2026-08-10T12:00:00+00:00",
+      "before_artifact_id": "artifact-1"
+    }
+  },
+  "artifact_page": {
+    "contract_version": "1",
+    "items": [
+      {
+        "contract_version": "1",
+        "provider_id": "storage.test",
+        "artifact_id": "artifact-1",
+        "workspace_id": "workspace-1",
+        "scope": {
+          "namespace": "core",
+          "kind": "workspace",
+          "id": "workspace-1",
+          "parent": null
+        },
+        "media_type": "application/octet-stream",
+        "byte_length": 16,
+        "sha256": "42bd420cc2f99e68e60005fa7c28fc2f60e4e04ee160d9dd3b98e72fc2954f98",
+        "created_at": "2026-08-10T12:00:00+00:00",
+        "name": "result.bin",
+        "metadata": {
+          "safe": true
+        }
+      }
+    ],
+    "next_cursor": {
+      "contract_version": "1",
+      "provider_id": "storage.test",
+      "workspace_id": "workspace-1",
+      "scope": {
+        "namespace": "core",
+        "kind": "workspace",
+        "id": "workspace-1",
+        "parent": null
+      },
+      "limit": 2,
+      "query_fingerprint": "6b0b5fec31c83539923fb051726005a540b6877f4d38d419ff4e420a8882e421",
+      "before_created_at": "2026-08-10T12:00:00+00:00",
+      "before_artifact_id": "artifact-1"
+    }
+  }
+}

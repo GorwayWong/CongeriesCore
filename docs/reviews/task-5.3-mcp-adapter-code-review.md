@@ -352,13 +352,13 @@ These are not Task 5.3 contract failures, but they should shape later work:
    A future transport package must keep credentials and headers out of public
    contracts and redacted events.
 
-## 9. Recommended Next Work
+## 9. Completed Follow-up and Next Work
 
-The next product slice should complete Tasks 6.2 and 6.3 together: freeze the
-storage contract, implement Workspace/Artifact/StorageProvider boundaries, run a
-shared suite over two implementations, and add exact compatibility fixtures.
+Tasks 6.2 and 6.3 are complete through RFC-0015, authorized
+Workspace/Artifact/StorageProvider boundaries, one shared in-memory and SQLite
+contract suite, and exact compatibility fixtures.
 
-Only after that durable foundation is complete should Task 4.1 expand, in
-increasing side-effect risk: ContextNode, SkillNode, then ToolNode. Agent Tool
-loops, automatic Skill injection, parallel scheduling, and external Workflow
-engines should remain separate proposals with their own review gates.
+The next product slice is Task 4.1 ContextNode. SkillNode and ToolNode follow in
+increasing side-effect risk. Agent Tool loops, automatic Skill injection,
+parallel scheduling, and external Workflow engines remain separate proposals
+with their own review gates.

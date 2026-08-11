@@ -48,5 +48,40 @@
     "namespace": "core",
     "name": "model.stream",
     "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.capabilities",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.workspace.create",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.workspace.get",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.workspace.compare_and_set",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.artifact.put",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.artifact.get",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "storage.artifact.list",
+    "version": "1"
   }
 ]

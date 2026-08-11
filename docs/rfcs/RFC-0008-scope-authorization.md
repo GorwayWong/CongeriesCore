@@ -6,8 +6,8 @@
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
-- Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md), [RFC-0012](RFC-0012-evaluation.md), [RFC-0013](RFC-0013-skill-tool-contracts.md)
+- Updated: 2026-08-12
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md), [RFC-0012](RFC-0012-evaluation.md), [RFC-0013](RFC-0013-skill-tool-contracts.md), [RFC-0015](RFC-0015-storage-artifact-contracts.md)
 - Supersedes: Security and isolation portions of the legacy RFC-0006 draft
 
 ## 1. Scope
@@ -109,6 +109,10 @@ The v0.2 protected Provider actions are:
 - `core.memory.capabilities`, `core.memory.retrieve`, `core.memory.remember`,
   `core.memory.forget`, `core.memory.consolidate`
 - `core.model.capabilities`, `core.model.generate`, `core.model.stream`
+- `core.storage.capabilities`, `core.storage.workspace.create`,
+  `core.storage.workspace.get`, `core.storage.workspace.compare_and_set`,
+  `core.storage.artifact.put`, `core.storage.artifact.get`,
+  `core.storage.artifact.list`
 - `core.checkpoint.save`, `core.checkpoint.load`, `core.checkpoint.list`,
   `core.checkpoint.delete`
 - `core.approval.decide`
@@ -126,6 +130,13 @@ preserve SchemaRef while only shrinking metadata keys and maximum bytes. Forget
 grants preserve Memory identity and expected version. Consolidate grants
 preserve policy identity and selection keys. Unknown, malformed, or expanding
 Memory constraints are invalid grants and prevent Provider invocation.
+
+Storage constraints are operation-specific. Workspace grants preserve Provider,
+Workspace, expected version, and new version. Artifact put/get grants preserve
+Provider, Workspace, Artifact, digest, and byte length. List grants preserve
+Provider and Workspace and may only lower the limit; an existing cursor forbids
+limit drift. Unknown, malformed, or expanding Storage constraints are invalid
+grants and prevent Provider invocation.
 
 Checkpoint constraints are operation-specific. Save preserves Run, Workflow,
 definition, graph version, sequence, and predecessor identity. Load and delete
@@ -186,15 +197,17 @@ v0.2 capability paths that currently exist: Skill resource reads, local and
 MCP-backed Tool invocations, ContextProvider capability and
 provide calls, MemoryProvider capability and operation calls, ModelProvider
 capability, generate, and stream calls, CheckpointStore save, load, list, and
-delete calls, approval decisions, and EventSink dispatch. Their non-bypass,
+delete calls, StorageProvider capability, Workspace, and Artifact calls, approval
+decisions, and EventSink dispatch. Their non-bypass,
 default-deny, unknown-action, constraint, cross-scope audit, deadline,
 cancellation, and audit-failure behavior is covered by contract or integration
 tests.
 
 MCP-backed ContextProvider calls and discovery reuse those same Tool and Context
 Actions; their default denial, invalid-grant, Scope-escape, and zero-transport-
-effect behavior is covered by RFC-0014's dual-transport suite. General
-StorageProvider contracts are not implemented by this status. Each future
-capability must register versioned actions and reuse this boundary before its
-own delivery task may be marked Implemented. Skill and Tool grant constraints
-and execution order are defined by RFC-0013.
+effect behavior is covered by RFC-0014's dual-transport suite. Storage default
+denial, immutable-constraint validation, Scope narrowing, cancellation, and
+dual-adapter behavior are covered by RFC-0015. Each future capability must
+register versioned actions and reuse this boundary before its own delivery task
+may be marked Implemented. Skill and Tool grant constraints and execution order
+are defined by RFC-0013.

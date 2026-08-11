@@ -317,11 +317,25 @@ path. It applies authorization constraints, validates structured output through
 SchemaRegistry, normalizes stream termination, and closes cancellable streams.
 Fallback occurs only for unavailable or unsupported capability outcomes.
 
-Storage remains an abstraction:
+Storage is an authorized Provider abstraction:
 
 ```text
-Core Contract -> Provider or Adapter -> External Implementation
+Caller -> StorageGateway -> AuthorizedDispatcher -> StorageProviderRegistry
+       -> WorkspaceRepository | ArtifactRepository -> Adapter
 ```
+
+WorkspaceRepository creates, reads, and compare-and-set updates strict versioned
+WorkspaceState values. ArtifactRepository writes immutable caller-identified
+bytes, reads them by scoped identity, and lists metadata through fingerprinted
+keyset cursors. ArtifactReference carries durable identity and SHA-256 without
+embedding content or business metadata.
+
+The thread-safe in-memory Provider and standard-library SQLite Provider pass the
+same contract suite. SQLite is a reference external adapter, not a mandatory
+database. Storage operations reuse RuntimeCallContext, default-deny dispatch,
+Scope narrowing, deadline and cancellation control, normalized errors, and
+redacted Provider events. See
+[RFC-0015](docs/rfcs/RFC-0015-storage-artifact-contracts.md).
 
 ## 8. Checkpoint and Recovery
 

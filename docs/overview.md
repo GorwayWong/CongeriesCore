@@ -122,8 +122,8 @@ The verified direct Agent slice includes:
 - Authorized Memory capability discovery, pagination, idempotent mutation,
   optional consolidation, cancellation cleanup, and redacted operation events
 - Stable v0.2 compatibility fixtures for Content, Context, Model, AgentSpec,
-  Memory, Checkpoint, approval, Workflow, Evaluation, MCP, Provider actions, and
-  Core event catalogs
+  Memory, Storage, Checkpoint, approval, Workflow, Evaluation, MCP, Provider
+  actions, and Core event catalogs
 - Authorized in-memory CheckpointStore, canonical integrity, marker commits,
   migration/fallback policy, minimal restoration, and approval persistence
 - Immutable Workflow contracts, strict DAG validation, deterministic
@@ -141,6 +141,9 @@ The verified direct Agent slice includes:
   Context bindings on protocol revision `2026-07-28`, with atomic Plugin
   composition, local Schema authority, redacted events, and dual fake-transport
   conformance
+- Authorized Storage v1 with versioned Workspace compare-and-set, immutable
+  SHA-256 Artifact bytes, scoped stable pagination, redacted events, and matching
+  thread-safe in-memory and durable SQLite reference adapters
 
 The following remain outside this implemented slice:
 
@@ -197,6 +200,26 @@ The current fake stdio and fake stateless HTTP implementations test this shared
 behavior without claiming real wire compatibility. See the
 [MCP Adapter Code Review Guide](reviews/task-5.3-mcp-adapter-code-review.md) for
 the commit order, execution paths, and reviewer checklist.
+
+## Storage in Plain Language
+
+Workspace state behaves like a versioned document: each writer names the version
+it read, and only one writer can replace that version. Artifact content behaves
+like a sealed package: the caller supplies its stable identity, length, and
+SHA-256. Repeating the same package is safe; trying to reuse the identity for
+different bytes is a conflict.
+
+Every operation passes through the same default-deny authorization boundary as
+other Providers. List cursors are bound to Provider, Workspace, Scope, limit,
+and ordering boundary, so they cannot be reused to widen a query. Events expose
+operation counts, byte counts, latency, and safe errors but never content,
+metadata, Workspace values, SQL, or database paths.
+
+The in-memory and SQLite implementations run the same contract suite. SQLite is
+only a durable reference adapter and adds no production dependency. Artifact
+update, deletion, and garbage collection remain deliberately absent until a
+future retention and migration contract can protect durable references. See
+[RFC-0015](rfcs/RFC-0015-storage-artifact-contracts.md).
 
 ## Implemented Minimal Workflow Runtime
 
@@ -284,6 +307,7 @@ and infrastructure remain replaceable through adapters and providers.
 | Evaluation pipeline and node boundary | [RFC-0012](rfcs/RFC-0012-evaluation.md) |
 | Skill and Tool contracts | [RFC-0013](rfcs/RFC-0013-skill-tool-contracts.md) |
 | MCP Adapter | [RFC-0014](rfcs/RFC-0014-mcp-adapter.md) |
+| Storage and Artifact contracts | [RFC-0015](rfcs/RFC-0015-storage-artifact-contracts.md) |
 
 Cross-cutting rationale is indexed in the [ADR Registry](adrs/README.md), and
 implementation sequencing is defined in [tasks.md](../tasks.md).

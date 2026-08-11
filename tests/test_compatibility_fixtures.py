@@ -41,6 +41,14 @@ from congeries_core.provider.memory import (
     MemoryQuery,
 )
 from congeries_core.provider.model import ModelBinding
+from congeries_core.provider.storage import (
+    ArtifactPage,
+    ArtifactQuery,
+    ArtifactReference,
+    ArtifactValue,
+    StorageCapabilities,
+    storage_actions,
+)
 from congeries_core.runtime.content import ContentBlock
 from congeries_core.runtime.errors import ErrorDetail
 from congeries_core.runtime.json_types import as_array, as_object
@@ -50,6 +58,7 @@ from congeries_core.skill import (
     SkillResourceRequest,
     skill_actions,
 )
+from congeries_core.state.workspace import WorkspaceState
 from congeries_core.tool import (
     ToolCall,
     ToolDescriptor,
@@ -147,6 +156,36 @@ def test_memory_v02_fixture_round_trips_exactly() -> None:
     assert MemoryCapabilities.from_data(capabilities.to_data()) == capabilities
     assert reconstructed == data
     assert _serialized(reconstructed) == _text("memory.json")
+
+
+def test_storage_v1_fixtures_round_trip_exactly() -> None:
+    data = _object("storage.json")
+    contracts = (
+        ("capabilities", StorageCapabilities),
+        ("workspace", WorkspaceState),
+        ("artifact_value", ArtifactValue),
+        ("artifact_reference", ArtifactReference),
+        ("artifact_query", ArtifactQuery),
+        ("artifact_page", ArtifactPage),
+    )
+    reconstructed: dict[str, object] = {}
+    for name, contract in contracts:
+        value = contract.from_data(as_object(data[name], name))
+        assert contract.from_data(value.to_data()) == value
+        reconstructed[name] = value.to_data()
+    assert reconstructed == data
+    assert _serialized(reconstructed) == _text("storage.json")
+
+    action_values = as_array(
+        json.loads(_text("storage_actions.json")), "Storage actions"
+    )
+    actions = tuple(
+        ActionRef.from_data(as_object(item, "Storage action")) for item in action_values
+    )
+    assert actions == storage_actions()
+    assert _serialized([item.to_data() for item in actions]) == _text(
+        "storage_actions.json"
+    )
 
 
 def test_provider_action_and_core_event_catalog_v02_fixtures() -> None:

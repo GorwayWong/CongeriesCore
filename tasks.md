@@ -25,13 +25,13 @@ follow-up work.
 | Area | Status | Delivered baseline |
 | --- | --- | --- |
 | Project and shared types | Implemented | Python 3.12 package, typed identifiers, JSON boundary, deadlines, cancellation, trace, and structured errors |
-| Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repository, Session lifecycle, and Workspace versioning |
+| Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repositories, Session lifecycle, strict Workspace wire versioning, and immutable Artifact references |
 | Scope and Authorization | Implemented | Generic Scope model, default-deny AuthorizedDispatcher, audit integration, and non-bypass Context, Memory, Model, and EventSink paths |
 | Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
-| Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, authorized CheckpointStore, recovery, approval persistence, and Evaluation; Artifact storage and provider-wide storage contracts remain |
+| Execution Harness and Storage | Implemented | RunService lifecycle coordination, active Provider-call cancellation, recovery, approval persistence, Evaluation, authorized Workspace/Artifact/Checkpoint storage, and in-memory plus SQLite reference adapters |
 | Context, Memory, Model, and direct Agent execution | Implemented | Authorized Context resolution, independent Memory operations, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
 | Workflow | In Progress | Minimal direct runtime with versioned contracts, DAG validation, AgentNode child Runs, durable output references, checkpoint recovery, ApprovalNode, EvaluationNode, and exact fixtures; remaining node catalog and engine adapters are deferred |
-| Plugins, Tools, and MCP | In Progress | Plugin v1 manifest, deterministic dependencies, atomic registry, execution leases, authorized lifecycle, safe drain/unload, events, and fixtures implemented; Skill, Tool, and MCP execution remain |
+| Plugins, Skills, Tools, and MCP | Implemented | Plugin v1 lifecycle and leases, immutable Skill/Tool contracts and gateways, transport-neutral MCP composition, authorization, events, and exact fixtures |
 
 ### 1.3 Current Workflow Milestone
 
@@ -109,7 +109,7 @@ Evaluation milestone acceptance:
 - In-memory fakes demonstrate identical outcomes through replaceable evaluator
   implementations, and the full coverage, Ruff, and Pyright gates remain green.
 
-### 1.5 Current Plugin Milestone and Next Recommendation
+### 1.5 Completed Plugin, Skill, Tool, and MCP Milestone
 
 **Task 5.1 Plugin SDK and Safe Unload is implemented.** Delivered:
 
@@ -130,13 +130,10 @@ Evaluation milestone acceptance:
 - Two fake loaders plus manifest, dependency, registry, lease, rollback, race,
   unload, authorization, event, and exact fixture tests.
 
-Start **Task 5.2 Skill and Tool Registries** next, using this lifecycle boundary
-for registration and execution. Freeze the standalone Skill and Tool contracts
-and gateways before connecting Agent or Workflow execution; otherwise those
-runtimes would accidentally become the place where registry, authorization, and
-idempotency rules are defined. Defer Task 5.3 MCP adapters, remaining Workflow
-node execution, parallel scheduling, external engines, and general
-StorageProvider work until their owning milestones.
+Tasks 5.2 and 5.3 subsequently delivered the standalone Skill and Tool
+registries and gateways plus the transport-neutral MCP Adapter. Agent Tool loops,
+automatic Skill injection, remaining Workflow node execution, parallel
+scheduling, and external Workflow engines remain separate milestones.
 
 ## 2. Phase 1: Architecture Baseline and Core Types
 
@@ -521,10 +518,7 @@ Delivered:
   grant, retry, timeout, drain race, replay, lease release, and Agent preflight
   coverage
 
-Implement discovery, versioned registration, progressive Skill loading, typed
-Tool schemas, authorization, execution policy, and idempotency declaration.
-
-Recommended delivery order:
+Implementation record:
 
 The sequence below is retained as the implementation record. Its step 8 gates
 are satisfied by the Task 5.2 suites together with the shared Plugin registry,
@@ -590,17 +584,10 @@ Acceptance:
 
 Status: Implemented in 0.2.0
 
-Implement capability discovery, schema mapping, Context and Tool integration,
-and policy enforcement.
+Delivered transport-neutral capability discovery, schema mapping, Context and
+Tool composition, authorization, lifecycle protection, and policy enforcement.
 
-Recommended next slice:
-
-Start this work only after the Task 5.2 change has completed review and the full
-verification gates provide a clean baseline. MCP adds a transport boundary; it
-must adapt the existing capability boundaries rather than creating another
-authorization, schema, retry, or lifecycle path.
-
-Recommended delivery order:
+Implementation record:
 
 1. Write and accept RFC-0014 before adding runtime code. Freeze MCP capability
    identity, discovery records, schema mapping, call context, error mapping,
@@ -683,7 +670,7 @@ Acceptance:
 
 ### Task 6.2 Storage Abstractions
 
-Status: In Progress
+Status: Implemented in 0.2.0
 
 Delivered:
 
@@ -693,13 +680,16 @@ Delivered:
 - Replaceable EventSequenceStore and AuditOutbox with in-memory and SQLite
   adapters
 - Authorized CheckpointStore contract and thread-safe in-memory adapter
-
-Remaining:
-
-- Workspace and Artifact repository contracts
-- StorageProvider boundary and authorization for all state access
-- Common contract tests shared by in-memory and external adapters
-- Standard storage failure mapping and compatibility fixtures
+- RFC-0015 strict WorkspaceRepository, ArtifactRepository, StorageProvider,
+  StorageProviderRegistry, StorageGateway, capability, action, event, error, and
+  compatibility contracts
+- Thread-safe in-memory and standard-library SQLite Providers running one shared
+  contract suite, including concurrent Workspace CAS, restart persistence,
+  transaction rollback, immutable Artifact replay/conflict, stable pagination,
+  cursor drift, and Scope isolation
+- Authorized dispatch for every Storage action with exact immutable constraints,
+  list-limit narrowing, deadline, cancellation, late-result discard, protocol
+  validation, and redacted operation events
 
 Implement replaceable Workspace, Artifact, Session, Run, and Checkpoint storage
 contracts and adapters without selecting a mandatory database.
@@ -712,19 +702,21 @@ Acceptance:
 
 ### Task 6.3 Compatibility Suite
 
-Status: In Progress
+Status: Implemented in 0.2.0
 
 Delivered:
 
 - Stable v0.2 JSON fixtures for Content, ContextBinding, ModelBinding, AgentSpec,
-  Memory, Checkpoint, approval, Workflow, and Evaluation contracts, plus Provider,
-  Checkpoint, Workflow, and Evaluation action catalogs and the Core event catalog
+  Memory, Checkpoint, approval, Workflow, Evaluation, Skill, Tool, and MCP
+  contracts, plus Provider, Checkpoint, Workflow, Evaluation, Skill, Tool, MCP,
+  and Plugin action catalogs and the Core event catalog
 - Exact deserialize, equality, and reserialize checks for delivered fixtures
-
-Remaining:
-
-- Storage contract fixtures after those public schemas are implemented
-- Migration fixtures and compatibility checks for future contract versions
+- Exact Storage v1 fixtures for actions, WorkspaceState, StorageCapabilities,
+  ArtifactValue bytes/base64, ArtifactReference, query, cursor, page, Provider
+  actions, and Core events
+- Explicit RFC-0015 rule that no historical Storage migration fixture is
+  fabricated for the first public version; a future v2 must add migration
+  guidance and fixtures before changing v1 behavior
 
 Add compatibility fixtures for public schemas, provider contracts, plugin
 manifests, event envelopes, and checkpoint formats.
@@ -746,27 +738,22 @@ Acceptance:
 
 ## 9. Next Recommended Milestone
 
-Complete the storage and compatibility foundation before expanding Agent or
-Workflow execution. Task 6.2 and Task 6.3 are the only remaining infrastructure
-tasks whose status is still In Progress, and durable capability outputs will be
-needed by later Workflow nodes.
+Tasks 6.2 and 6.3 have completed the storage and compatibility foundation. The
+next milestone returns to Task 4.1 and implements Workflow `ContextNode` by
+composing the existing ContextResolver without creating another Provider,
+authorization, persistence, or recovery path.
 
 Recommended order:
 
-1. Review and merge Task 5.3 as a clean baseline. Resolve any P0-P2 finding in
-   the MCP review guide before starting another public contract.
-2. Draft and accept the next storage RFC before adding new interfaces. Freeze
-   Workspace and Artifact identities, repository operations, authorization,
-   compare-and-set behavior, pagination, failure mapping, lifecycle ownership,
-   and compatibility rules. Keep concrete databases optional.
-3. Implement transport-neutral Workspace, Artifact, and StorageProvider
-   contracts plus an in-memory adapter. Reuse `RuntimeCallContext`,
-   `AuthorizedDispatcher`, Scope narrowing, deadlines, cancellation, and the
-   shared structured error model.
-4. Run one storage contract suite against two independent implementations and
-   finish the Task 6.3 fixtures in the same slice. A storage contract is not
-   complete while only its in-memory implementation has been exercised.
-5. After Tasks 6.2 and 6.3 are complete, return to Task 4.1 in increasing order
-   of side-effect risk: ContextNode, SkillNode, then ToolNode. Keep Agent Tool
-   loops, automatic Skill injection, parallel scheduling, and external Workflow
-   engines in separately reviewed work.
+1. Freeze ContextNode configuration, binding, output-reference, failure,
+   checkpoint, recovery, and compatibility behavior as an RFC-0003 increment.
+2. Dispatch ContextNode through the existing authorized ContextResolver and
+   persist any downstream-required result through the Workflow output boundary
+   before committing the stable node Checkpoint.
+3. Cover default denial, partial and failed resolution, deadline, cancellation,
+   late results, output persistence, recovery skip, and downstream gating.
+4. Add exact Workflow fixtures, then proceed to SkillNode and ToolNode in
+   increasing side-effect risk.
+
+Agent Tool loops, automatic Skill injection, parallel scheduling, and external
+Workflow engines remain separately reviewed future work.

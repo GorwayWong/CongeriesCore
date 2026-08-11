@@ -137,7 +137,22 @@ Core shall define vendor-neutral `generate`, `stream`, and `capabilities`
 operations. The contract shall support structured output, usage, deadlines,
 cancellation, policy, and structured errors without exposing vendor types.
 
-### 6.6 Shared Provider Errors
+### 6.6 StorageProvider
+
+Core shall define replaceable Workspace and immutable Artifact repository
+contracts behind an authorized StorageProvider boundary. Workspace writes shall
+use compare-and-set versions. Artifact writes shall validate caller-supplied
+identity, byte length, SHA-256, UTC creation time, Scope, and owning Workspace;
+same-identity same-content replay shall be idempotent and different content shall
+conflict. Artifact list operations shall use stable scoped pagination.
+
+All StorageProvider operations shall receive RuntimeCallContext, deny by default,
+normalize backend failures, and emit redacted events without Artifact content,
+business metadata, Workspace values, or backend detail. Core shall provide no
+mandatory database. Artifact update, deletion, garbage collection, and retention
+require a later contract that preserves or migrates durable references.
+
+### 6.7 Shared Provider Errors
 
 Provider contracts shall represent at least invalid request, denied,
 unavailable, timeout, cancelled, conflict, version mismatch, and partial-result
