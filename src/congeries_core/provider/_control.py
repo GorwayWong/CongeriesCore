@@ -41,6 +41,12 @@ async def await_provider[ResultT](
             "runtime call deadline has expired",
             retryable=True,
         )
+    except BaseException:
+        # Cancellation of this wrapper (for example by an enclosing Tool
+        # deadline) must not orphan the provider/transport Task. Await teardown
+        # before propagating so a late result cannot escape its lease boundary.
+        await _cancel_and_wait(operation_task)
+        raise
     finally:
         cancellation_task.cancel()
         await _ignore_cancellation(cancellation_task)

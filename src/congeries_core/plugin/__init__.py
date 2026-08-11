@@ -19,6 +19,7 @@ from .lifecycle import (
     PluginStateRecord,
 )
 from .loader import (
+    CompositeCapabilityImplementation,
     LoadedCapability,
     PluginHooks,
     PluginLoader,
@@ -80,6 +81,7 @@ __all__ = [
     "CapabilityRegistrySnapshot",
     "CapabilityType",
     "CatalogCapability",
+    "CompositeCapabilityImplementation",
     "DependencyKind",
     "DependencyResolutionPlan",
     "DependencyResolver",

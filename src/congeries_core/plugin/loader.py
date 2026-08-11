@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from congeries_core.runtime.context import RuntimeCallContext
 
@@ -32,6 +32,15 @@ class PreparedPlugin:
     manifest: PluginManifest
     capabilities: tuple[LoadedCapability, ...]
     hooks: PluginHooks = PluginHooks()
+
+
+@runtime_checkable
+class CompositeCapabilityImplementation(Protocol):
+    """A capability that validates its atomically published companion set."""
+
+    def validate_composition(
+        self, plugin_id: str, capabilities: tuple[LoadedCapability, ...]
+    ) -> None: ...
 
 
 class PluginLoader(Protocol):

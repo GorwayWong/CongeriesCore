@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import suppress
 from datetime import datetime, timedelta
+from typing import Protocol, runtime_checkable
 
 from congeries_core.plugin.invocation import PluginCapabilityInvoker
 from congeries_core.plugin.registry import CapabilityRegistration
@@ -38,6 +39,13 @@ from .registry import ToolRegistry
 TOOL_INVOCATION_STARTED = "core.tool.invocation_started"
 TOOL_INVOCATION_COMPLETED = "core.tool.invocation_completed"
 TOOL_INVOCATION_FAILED = "core.tool.invocation_failed"
+
+
+@runtime_checkable
+class _AttemptAwareExecutor(Protocol):
+    async def execute_attempt(
+        self, call: ToolCall, context: RuntimeCallContext, attempt: int
+    ) -> JsonValue: ...
 
 
 class ToolGateway:
@@ -101,7 +109,7 @@ class ToolGateway:
                     attempts += 1
                     try:
                         output = await self._execute_attempt(
-                            implementation, call, effective_context
+                            implementation, call, effective_context, attempts
                         )
                         normalized = as_json_value(output, "Tool output")
                         self._schemas.validate(descriptor.output_schema, normalized)
@@ -216,10 +224,15 @@ class ToolGateway:
         implementation: ToolImplementation,
         call: ToolCall,
         context: RuntimeCallContext,
+        attempt: int,
     ) -> JsonValue:
         # Owning the Task explicitly lets timeout/cancellation await its teardown;
         # no late executor completion can escape into a later retry or lease.
-        execution = asyncio.create_task(implementation.executor.execute(call, context))
+        if isinstance(implementation.executor, _AttemptAwareExecutor):
+            operation = implementation.executor.execute_attempt(call, context, attempt)
+        else:
+            operation = implementation.executor.execute(call, context)
+        execution = asyncio.create_task(operation)
         try:
             return await await_provider(execution, context, self._clock)
         finally:

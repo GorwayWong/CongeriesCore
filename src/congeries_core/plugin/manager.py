@@ -32,9 +32,10 @@ from .errors import plugin_error
 from .events import NullPluginEventPublisher, PluginEventPublisher
 from .invocation import PluginCapabilityInvoker
 from .lifecycle import PluginLifecycleController, PluginStateRecord
-from .loader import PluginLoader, PreparedPlugin
+from .loader import CompositeCapabilityImplementation, PluginLoader, PreparedPlugin
 from .manifest import ManifestValidator, PluginPreflight
 from .model import (
+    CapabilityType,
     PluginHookName,
     PluginLifecycleState,
     PluginManifest,
@@ -676,6 +677,31 @@ class PluginManager:
                 "Loader capabilities do not exactly match the manifest",
                 plugin=manifest.name,
             )
+        for capability in prepared.capabilities:
+            if capability.declaration.type is not CapabilityType.MCP_ADAPTER:
+                continue
+            implementation = capability.implementation
+            if not isinstance(implementation, CompositeCapabilityImplementation):
+                raise plugin_error(
+                    ErrorCategory.PROTOCOL_FAILURE,
+                    "plugin_load_failed",
+                    "MCP Adapter cannot validate its atomic capability composition",
+                    plugin=manifest.name,
+                    capability=capability.declaration.capability_id,
+                )
+            try:
+                implementation.validate_composition(
+                    manifest.name, prepared.capabilities
+                )
+            except (TypeError, ValueError) as error:
+                raise plugin_error(
+                    ErrorCategory.PROTOCOL_FAILURE,
+                    "plugin_load_failed",
+                    "MCP Adapter capability composition is invalid",
+                    cause_id=type(error).__name__,
+                    plugin=manifest.name,
+                    capability=capability.declaration.capability_id,
+                ) from error
         for hook_name in PluginHookName:
             present = getattr(prepared.hooks, hook_name.value) is not None
             declared_hook = hook_name in manifest.lifecycle
