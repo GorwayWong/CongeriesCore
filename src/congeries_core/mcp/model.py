@@ -146,6 +146,13 @@ class McpContextBinding:
 
 @dataclass(frozen=True, slots=True)
 class McpAdapterDescriptor:
+    """A local allowlist of remote capabilities, not a discovery result.
+
+    Keeping the declared bindings separate from the server snapshot is the core
+    security property: discovery may prove that a binding still matches, but it
+    cannot make an undeclared remote capability locally callable.
+    """
+
     ref: CapabilityRef
     service_id: str
     protocol_version: str = MCP_PROTOCOL_VERSION
@@ -519,6 +526,13 @@ class McpResourceResponse:
 
 
 class McpTransport(Protocol):
+    """Minimal transport port; wire/session/credential types stop behind it.
+
+    Retry, authorization, Schema registration, and lifecycle ownership are
+    intentionally absent. Those decisions belong to the existing local
+    gateways, so two transports cannot produce different policy semantics.
+    """
+
     @property
     def kind(self) -> str: ...
 
@@ -535,6 +549,8 @@ class McpTransport(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class McpAdapterImplementation:
+    """One frozen descriptor paired with one Plugin-owned transport instance."""
+
     descriptor: McpAdapterDescriptor
     transport: McpTransport
 
@@ -545,6 +561,9 @@ class McpAdapterImplementation:
     def validate_composition(
         self, plugin_id: str, capabilities: tuple[LoadedCapability, ...]
     ) -> None:
+        # Import lazily because composition validates concrete facade types that
+        # themselves import this model. The dependency is validation-only and
+        # must not turn transport construction into a registry side effect.
         from .composition import validate_mcp_composition
 
         validate_mcp_composition(self, plugin_id, capabilities)

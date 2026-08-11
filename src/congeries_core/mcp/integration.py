@@ -77,6 +77,13 @@ def mcp_actions() -> tuple[ActionRef, ActionRef, ActionRef]:
 
 
 class _McpClient:
+    """Private bridge from authorized local facades to an untrusted transport.
+
+    It owns discovery validation, task control, error normalization, and redacted
+    MCP observability. Public callers cannot obtain this client; they must enter
+    through ToolGateway or ContextResolver first.
+    """
+
     def __init__(
         self,
         implementation: McpAdapterImplementation,
@@ -131,6 +138,9 @@ class _McpClient:
         context: RuntimeCallContext,
         attempt: int,
     ) -> JsonValue:
+        # Revalidate discovery before every attempt. This is intentionally not a
+        # transport retry: ToolGateway alone decides whether another attempt may
+        # happen, and it passes the stable operation identity and attempt number.
         await self.discover(context)
         identity = _operation_identity(context)
         started_at = self._clock.now()
@@ -238,6 +248,9 @@ class _McpClient:
     async def _transport_call[T](
         self, operation: Awaitable[T], context: RuntimeCallContext
     ) -> T:
+        # await_provider cancels and awaits the concrete transport Task on
+        # timeout/cancellation. Normalize anything transport-specific only after
+        # that cleanup, without exposing exception text, frames, or credentials.
         try:
             return await await_provider(operation, context, self._clock)
         except CoreError:
@@ -311,6 +324,8 @@ class _McpClient:
 
 @dataclass(frozen=True, slots=True)
 class McpToolExecutor:
+    """Internal executor for one ordinary local Tool bound to MCP."""
+
     descriptor: ToolDescriptor
     adapter: McpAdapterImplementation
     clock: Clock
@@ -345,6 +360,12 @@ class McpToolExecutor:
 
 @dataclass(frozen=True, slots=True)
 class McpContextProviderImplementation:
+    """Lease-protected Plugin implementation behind the Context facade.
+
+    This object may touch the transport, so it stays opaque until
+    PluginCapabilityInvoker has authorized the operation and acquired a lease.
+    """
+
     adapter: McpAdapterImplementation
     binding: McpContextBinding
     schemas: SchemaRegistry
@@ -431,6 +452,13 @@ class McpContextProviderImplementation:
 
 @dataclass(frozen=True, slots=True)
 class McpContextProviderFacade:
+    """Public ContextProvider shape that re-enters the Plugin safety boundary.
+
+    ContextResolver owns the outer Context policy and merge semantics. This
+    facade adds the mapped Plugin permission, grant-narrowing, and execution
+    lease without exposing a direct MCP resource-read gateway.
+    """
+
     binding: McpContextBinding
     invoker: PluginCapabilityInvoker
 
@@ -592,6 +620,9 @@ def _child_invocation_context(
     context: RuntimeCallContext, operation: str
 ) -> RuntimeCallContext:
     identity = _operation_identity(context)
+    # ContextResolver has already used the caller identity for its outer provider
+    # operation. Derive a stable, operation-specific child identity so the nested
+    # Plugin reservation neither collides with that call nor changes on recovery.
     return replace(
         context,
         idempotency_key=IdempotencyKey(f"{identity}:mcp-context:{operation}"),

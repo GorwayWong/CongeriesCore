@@ -677,6 +677,9 @@ class PluginManager:
                 "Loader capabilities do not exactly match the manifest",
                 plugin=manifest.name,
             )
+        # Composite MCP mappings must be complete before the registry transaction.
+        # Remote discovery is verification-only and may never publish a missing
+        # Tool or ContextProvider after the Plugin becomes visible.
         for capability in prepared.capabilities:
             if capability.declaration.type is not CapabilityType.MCP_ADAPTER:
                 continue

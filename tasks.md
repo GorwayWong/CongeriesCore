@@ -743,3 +743,30 @@ Acceptance:
 - Recovery is at least once and side effects are idempotent.
 - Runtime Events are not Event Sourcing.
 - No mandatory dependency on a specific Agent framework or infrastructure.
+
+## 9. Next Recommended Milestone
+
+Complete the storage and compatibility foundation before expanding Agent or
+Workflow execution. Task 6.2 and Task 6.3 are the only remaining infrastructure
+tasks whose status is still In Progress, and durable capability outputs will be
+needed by later Workflow nodes.
+
+Recommended order:
+
+1. Review and merge Task 5.3 as a clean baseline. Resolve any P0-P2 finding in
+   the MCP review guide before starting another public contract.
+2. Draft and accept the next storage RFC before adding new interfaces. Freeze
+   Workspace and Artifact identities, repository operations, authorization,
+   compare-and-set behavior, pagination, failure mapping, lifecycle ownership,
+   and compatibility rules. Keep concrete databases optional.
+3. Implement transport-neutral Workspace, Artifact, and StorageProvider
+   contracts plus an in-memory adapter. Reuse `RuntimeCallContext`,
+   `AuthorizedDispatcher`, Scope narrowing, deadlines, cancellation, and the
+   shared structured error model.
+4. Run one storage contract suite against two independent implementations and
+   finish the Task 6.3 fixtures in the same slice. A storage contract is not
+   complete while only its in-memory implementation has been exercised.
+5. After Tasks 6.2 and 6.3 are complete, return to Task 4.1 in increasing order
+   of side-effect risk: ContextNode, SkillNode, then ToolNode. Keep Agent Tool
+   loops, automatic Skill injection, parallel scheduling, and external Workflow
+   engines in separately reviewed work.

@@ -59,6 +59,13 @@ def validate_discovery(
     descriptor: McpAdapterDescriptor,
     snapshot: McpDiscoverySnapshot,
 ) -> McpDiscoverySnapshot:
+    """Match a remote snapshot to the frozen local allowlist.
+
+    This function is pure: it neither registers remote Schemas nor publishes
+    capabilities. A caller may proceed only with the filtered snapshot returned
+    here, never with the transport's untrusted snapshot directly.
+    """
+
     if snapshot.protocol_version != MCP_PROTOCOL_VERSION:
         raise core_error(
             ErrorCategory.VERSION_MISMATCH,
@@ -78,6 +85,8 @@ def validate_discovery(
             "remote MCP service identity does not match the Adapter",
         )
 
+    # Iterate the local bindings, not the advertised records. This makes the
+    # descriptor the source of authority and leaves unknown remote Tools unused.
     discovered_tools = {item.name: item for item in snapshot.tools}
     tools: list[McpRemoteTool] = []
     for binding in descriptor.tool_bindings:
@@ -93,6 +102,8 @@ def validate_discovery(
             _schema_mismatch("MCP Tool output Schema changed")
         tools.append(remote)
 
+    # Resource URIs follow the same allowlist rule. V1 deliberately has no URI
+    # templates or enumeration path that could widen this exact match.
     discovered_resources = {item.uri: item for item in snapshot.resources}
     resources: list[McpRemoteResource] = []
     for binding in descriptor.context_bindings:
@@ -103,6 +114,8 @@ def validate_discovery(
             _schema_mismatch("MCP resource Schema changed")
         resources.append(remote)
 
+    # Returning a copy with only bound records prevents later code from
+    # accidentally treating a well-formed but undeclared advertisement as usable.
     return replace(snapshot, tools=tuple(tools), resources=tuple(resources))
 
 

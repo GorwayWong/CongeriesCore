@@ -19,6 +19,13 @@ def validate_mcp_composition(
     plugin_id: str,
     capabilities: tuple[LoadedCapability, ...],
 ) -> None:
+    """Validate the complete prepared Plugin before its atomic registry commit.
+
+    Discovery is never allowed to fill a missing declaration later. Every local
+    facade must already be present and must point at this exact adapter instance,
+    so publication either exposes the whole mapping or exposes none of it.
+    """
+
     descriptor = adapter.descriptor
     if descriptor.ref.owning_extension != plugin_id:
         raise ValueError("MCP Adapter owner does not match its Plugin")

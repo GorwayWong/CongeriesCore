@@ -31,6 +31,31 @@ Workflow SkillNode/ToolNode scheduling, Agent Tool loops, automatic Skill
 injection, and raw database, table, filesystem, or CRUD exposure are outside
 this RFC.
 
+### 1.1 Plain-language model
+
+Think of the MCP Adapter as a customs checkpoint, not as a universal remote
+control for another server.
+
+Before a Plugin becomes active, the application writes down the exact remote
+Tools and resource URIs it intends to use, the local Tool or Context capability
+each one represents, and the Schema fingerprint expected for each remote value.
+That list is the allowlist. Remote discovery can confirm that the promised
+capabilities still exist, but it cannot add a capability, install a Schema, or
+grant itself permission.
+
+When a caller uses one of those capabilities, nothing calls MCP directly. A Tool
+still enters through `ToolGateway`; Context still enters through
+`ContextResolver`. The existing local boundary checks identity, input, Scope,
+authorization, deadline, cancellation, and idempotency before the adapter may
+perform remote work. The Plugin lease stays held until the remote response and
+the local output have both been checked, so unload cannot remove the transport
+while a call is still being cleaned up.
+
+The adapter therefore answers only one narrow question: "How does an already
+declared and already authorized local capability obtain its result from this MCP
+service?" It does not answer "What may the remote service expose?" or "Who is
+allowed to use it?" Those decisions remain local.
+
 ## 2. Capability and Service Identity
 
 `McpAdapterDescriptor` is an immutable version 1 contract. Its `CapabilityRef`
@@ -249,3 +274,8 @@ output Schema failure; disconnect; timeout; cancellation; late response and
 task cleanup; stable Tool attempt and recovery identity; no implicit transport
 retry; acquire/drain linearization; unload during use; lease release; cleanup
 failure; and recovery after transport failure.
+
+The two fake transports prove that these rules do not depend on one wire
+implementation. They do not claim stdio framing, HTTP status/header behavior,
+OAuth, or interoperability with a real MCP SDK. Those belong to optional
+transport packages and separate wire-level conformance work.

@@ -251,6 +251,10 @@ class PluginLifecycleController:
         capability_key: CapabilityKey,
         context: RuntimeCallContext,
     ) -> _InvocationReservation:
+        # A reservation and an execution lease solve different races. Reserve the
+        # idempotency identity before authorization so concurrent duplicates
+        # cannot both reach a side effect; acquire the lease later to protect the
+        # implementation itself from drain/unload.
         invocation = context.idempotency_key
         if invocation is None:
             raise plugin_error(

@@ -173,6 +173,31 @@ resolved public value never exposes the loader or executor. The detailed review
 path and safety checklist are in the
 [Skill and Tool v1 Code Review Guide](reviews/task-5.2-skill-tool-code-review.md).
 
+## MCP Adapter in Plain Language
+
+The MCP Adapter is a narrow bridge for capabilities the application has already
+approved locally. It is not a browser for everything a remote MCP server happens
+to advertise.
+
+Imagine that a Plugin pins a small menu before it is activated: remote Tool
+`search` is the implementation of one named local Tool, and resource URI
+`context://profile` is the source for one named local ContextProvider. The Plugin
+also pins fingerprints for the remote Schemas. Discovery checks that this menu
+still matches the server. Extra remote entries are ignored; missing or changed
+bound entries stop the call.
+
+After that check, normal Core rules still apply. Tool input and output use local
+Schemas, Context uses the existing resolver and budgets, authorization is local
+and deny-by-default, retries keep one operation identity, and a Plugin lease
+protects the transport until cleanup finishes. The remote server cannot widen a
+Scope, invent a grant, register a new capability, or expose a database through a
+generic read API.
+
+The current fake stdio and fake stateless HTTP implementations test this shared
+behavior without claiming real wire compatibility. See the
+[MCP Adapter Code Review Guide](reviews/task-5.3-mcp-adapter-code-review.md) for
+the commit order, execution paths, and reviewer checklist.
+
 ## Implemented Minimal Workflow Runtime
 
 The delivered direct Workflow Runtime is deliberately smaller than a complete
@@ -258,6 +283,7 @@ and infrastructure remain replaceable through adapters and providers.
 | Checkpoint, commit, and recovery | [RFC-0011](rfcs/RFC-0011-checkpoint-recovery.md) |
 | Evaluation pipeline and node boundary | [RFC-0012](rfcs/RFC-0012-evaluation.md) |
 | Skill and Tool contracts | [RFC-0013](rfcs/RFC-0013-skill-tool-contracts.md) |
+| MCP Adapter | [RFC-0014](rfcs/RFC-0014-mcp-adapter.md) |
 
 Cross-cutting rationale is indexed in the [ADR Registry](adrs/README.md), and
 implementation sequencing is defined in [tasks.md](../tasks.md).
