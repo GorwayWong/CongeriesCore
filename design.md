@@ -418,11 +418,12 @@ capabilities. Calls enter only through ToolGateway or ContextResolver and reuse
 RuntimeCallContext, AuthorizedDispatcher, local SchemaRegistry validation, and
 Plugin execution leases.
 
-The version 1 adapter is transport-neutral, consumes only MCP revision
-`2026-07-28`, and does not require an MCP SDK. Discovery verifies frozen
-bindings but never mutates the Plugin registry or installs remote Schemas.
-Legacy initialize/session protocols and real wire transports remain optional
-extension concerns. See [RFC-0014](docs/rfcs/RFC-0014-mcp-adapter.md).
+The implemented version 1 adapter is transport-neutral, consumes only MCP
+revision `2026-07-28`, and does not require an MCP SDK. Discovery verifies
+frozen bindings but never mutates the Plugin registry or installs remote
+Schemas. Legacy initialize/session protocols and real wire transports remain
+optional extension concerns. See
+[RFC-0014](docs/rfcs/RFC-0014-mcp-adapter.md).
 
 HTTP frameworks, API schemas, user sessions, and application services stay
 outside Core:

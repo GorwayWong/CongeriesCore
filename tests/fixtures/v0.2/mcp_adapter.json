@@ -1,0 +1,61 @@
+{
+  "ref": {
+    "namespace": "core",
+    "kind": "mcp_adapter",
+    "id": "test.mcp.adapter",
+    "owning_extension": "test.mcp",
+    "contract_version": "1"
+  },
+  "service_id": "remote.service",
+  "protocol_version": "2026-07-28",
+  "tool_bindings": [
+    {
+      "tool": {
+        "namespace": "core",
+        "kind": "tool",
+        "id": "test.mcp.tool",
+        "owning_extension": "test.mcp",
+        "contract_version": "1"
+      },
+      "remote_name": "remote.echo",
+      "input_schema": {
+        "namespace": "test",
+        "name": "mcp.input",
+        "version": "1"
+      },
+      "output_schema": {
+        "namespace": "test",
+        "name": "mcp.output",
+        "version": "1"
+      },
+      "input_schema_digest": "0c06e80292973be2475847326df7897aabc0a54d03fecba568fdcf40415b367d",
+      "output_schema_digest": "17248cc301c32af29f64978a7469d298a791720ddf93728275bc8471066b1c93"
+    }
+  ],
+  "context_bindings": [
+    {
+      "provider": {
+        "namespace": "core",
+        "kind": "context_provider",
+        "id": "test.mcp.context",
+        "owning_extension": "test.mcp",
+        "contract_version": "1"
+      },
+      "resource_uri": "mcp://remote/profile",
+      "requirements": [
+        {
+          "key": {
+            "namespace": "test",
+            "name": "profile"
+          },
+          "schema": {
+            "namespace": "test",
+            "name": "mcp.profile",
+            "version": "1"
+          }
+        }
+      ],
+      "resource_schema_digest": "620027db00f1034ad2fc561e6391bc71fd89a91f8059f4be6a691b464699469c"
+    }
+  ]
+}

@@ -21,6 +21,15 @@ from congeries_core.evaluation import (
 )
 from congeries_core.event.model import CoreEventType
 from congeries_core.harness.agent import AgentSpec
+from congeries_core.mcp import (
+    McpAdapterDescriptor,
+    McpDiscoverySnapshot,
+    McpResourceRequest,
+    McpResourceResponse,
+    McpToolRequest,
+    McpToolResponse,
+    mcp_actions,
+)
 from congeries_core.plugin import ManifestValidator, plugin_actions
 from congeries_core.policy.authorization import ActionRef
 from congeries_core.provider import provider_actions
@@ -33,6 +42,7 @@ from congeries_core.provider.memory import (
 )
 from congeries_core.provider.model import ModelBinding
 from congeries_core.runtime.content import ContentBlock
+from congeries_core.runtime.errors import ErrorDetail
 from congeries_core.runtime.json_types import as_array, as_object
 from congeries_core.skill import (
     SkillDescriptor,
@@ -157,6 +167,47 @@ def test_provider_action_and_core_event_catalog_v02_fixtures() -> None:
     events = [event.value for event in CoreEventType]
     assert event_values == events
     assert _serialized(events) == _text("core_events.json")
+
+
+def test_mcp_v1_fixtures_round_trip_exactly() -> None:
+    adapter = McpAdapterDescriptor.from_data(_object("mcp_adapter.json"))
+    assert McpAdapterDescriptor.from_data(adapter.to_data()) == adapter
+    assert _serialized(adapter.to_data()) == _text("mcp_adapter.json")
+
+    discovery = McpDiscoverySnapshot.from_data(_object("mcp_discovery.json"))
+    assert McpDiscoverySnapshot.from_data(discovery.to_data()) == discovery
+    assert _serialized(discovery.to_data()) == _text("mcp_discovery.json")
+
+    records = _object("mcp_records.json")
+    contracts = (
+        ("tool_request", McpToolRequest),
+        ("tool_response", McpToolResponse),
+        ("resource_request", McpResourceRequest),
+        ("resource_response", McpResourceResponse),
+    )
+    reconstructed: dict[str, object] = {}
+    for name, contract in contracts:
+        value = contract.from_data(as_object(records[name], name))
+        assert contract.from_data(value.to_data()) == value
+        reconstructed[name] = value.to_data()
+    assert reconstructed == records
+    assert _serialized(reconstructed) == _text("mcp_records.json")
+
+    action_values = as_array(json.loads(_text("mcp_actions.json")), "MCP actions")
+    actions = tuple(
+        ActionRef.from_data(as_object(item, "MCP action")) for item in action_values
+    )
+    assert actions == mcp_actions()
+    assert _serialized([item.to_data() for item in actions]) == _text(
+        "mcp_actions.json"
+    )
+
+    error_values = as_array(json.loads(_text("mcp_errors.json")), "MCP errors")
+    errors = tuple(
+        ErrorDetail.from_data(as_object(item, "MCP error")) for item in error_values
+    )
+    assert tuple(ErrorDetail.from_data(item.to_data()) for item in errors) == errors
+    assert _serialized([item.to_data() for item in errors]) == _text("mcp_errors.json")
 
 
 def test_checkpoint_approval_migration_and_action_v02_fixtures() -> None:

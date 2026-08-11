@@ -1,0 +1,17 @@
+[
+  {
+    "namespace": "core",
+    "name": "tool.execute",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "context.capabilities",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "context.provide",
+    "version": "1"
+  }
+]

@@ -122,8 +122,8 @@ The verified direct Agent slice includes:
 - Authorized Memory capability discovery, pagination, idempotent mutation,
   optional consolidation, cancellation cleanup, and redacted operation events
 - Stable v0.2 compatibility fixtures for Content, Context, Model, AgentSpec,
-  Memory, Checkpoint, approval, Workflow, Evaluation, Provider actions, and Core
-  event catalogs
+  Memory, Checkpoint, approval, Workflow, Evaluation, MCP, Provider actions, and
+  Core event catalogs
 - Authorized in-memory CheckpointStore, canonical integrity, marker commits,
   migration/fallback policy, minimal restoration, and approval persistence
 - Immutable Workflow contracts, strict DAG validation, deterministic
@@ -137,15 +137,16 @@ The verified direct Agent slice includes:
 - Immutable Skill/Tool v1 contracts, typed Plugin-registry views, progressive
   Skill resource reads, schema-aware Tool execution, in-lease retry, and
   AgentSpec v1/v2 compatibility
-- Accepted transport-neutral MCP Adapter v1 contract for explicit remote Tool
-  and exact-resource Context bindings on protocol revision `2026-07-28`
+- Transport-neutral MCP Adapter v1 for explicit remote Tool and exact-resource
+  Context bindings on protocol revision `2026-07-28`, with atomic Plugin
+  composition, local Schema authority, redacted events, and dual fake-transport
+  conformance
 
 The following remain outside this implemented slice:
 
 - Model-driven Tool execution loops
 - Skill, Tool, Context, and custom Workflow node execution
 - Parallel scheduling and external Workflow engine adapters
-- MCP Adapter implementation and transport contract coverage
 
 These future capability families must reuse the implemented authorization,
 RuntimeCallContext, cancellation, error, and event boundaries before their own

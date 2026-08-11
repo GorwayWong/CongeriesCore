@@ -2,6 +2,13 @@
 
 Status: Non-normative reviewer aid  
 Reviewed baseline: CongeriesCore 0.2.0, RFC-0013
+Review completed: 2026-08-12, baseline commit `a80f287`
+
+The completed review fixed strict AgentSpec and integer contract decoding,
+anchored the Tool whole-call deadline before authorization and lease admission,
+and prevented concurrent duplicate invocation identities. The clean baseline
+passed 238 tests with 91.39% coverage plus Ruff, Pyright, and `git diff --check`
+before MCP runtime code began.
 
 ## Purpose
 

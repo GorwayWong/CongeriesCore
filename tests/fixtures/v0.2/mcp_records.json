@@ -1,0 +1,33 @@
+{
+  "tool_request": {
+    "service_id": "remote.service",
+    "name": "remote.echo",
+    "arguments": {
+      "value": "hello"
+    },
+    "operation_identity": "operation-1",
+    "attempt": 1
+  },
+  "tool_response": {
+    "output": {
+      "ok": "hello"
+    }
+  },
+  "resource_request": {
+    "service_id": "remote.service",
+    "uri": "mcp://remote/profile",
+    "keys": [
+      "test:profile"
+    ],
+    "operation_identity": "operation-2"
+  },
+  "resource_response": {
+    "uri": "mcp://remote/profile",
+    "media_type": "application/json",
+    "contents": {
+      "test:profile": {
+        "name": "Ada"
+      }
+    }
+  }
+}

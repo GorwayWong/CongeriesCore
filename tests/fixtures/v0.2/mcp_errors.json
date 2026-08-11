@@ -1,0 +1,66 @@
+[
+  {
+    "category": "version_mismatch",
+    "code": "mcp_protocol_version_mismatch",
+    "message": "remote MCP protocol version is unsupported",
+    "retryable": false,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "unsupported_capability",
+    "code": "mcp_bound_capability_missing",
+    "message": "bound MCP capability is not advertised",
+    "retryable": false,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "protocol_failure",
+    "code": "mcp_malformed_discovery",
+    "message": "MCP discovery response is malformed",
+    "retryable": false,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "unavailable",
+    "code": "mcp_transport_unavailable",
+    "message": "MCP transport is unavailable",
+    "retryable": true,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "timeout",
+    "code": "deadline_exceeded",
+    "message": "runtime call deadline has expired",
+    "retryable": true,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "cancelled",
+    "code": "call_cancelled",
+    "message": "runtime call was cancelled",
+    "retryable": false,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "invalid_request",
+    "code": "invalid_mcp_binding",
+    "message": "MCP binding is invalid",
+    "retryable": false,
+    "cause_id": null,
+    "metadata": {}
+  },
+  {
+    "category": "denied",
+    "code": "invalid_grant",
+    "message": "MCP grant broadens the request",
+    "retryable": false,
+    "cause_id": null,
+    "metadata": {}
+  }
+]

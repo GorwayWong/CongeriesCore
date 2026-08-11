@@ -1,0 +1,38 @@
+{
+  "protocol_version": "2026-07-28",
+  "server": {
+    "service_id": "remote.service",
+    "name": "Remote Test",
+    "version": "1.0.0"
+  },
+  "discovery_identity": "discovery-1",
+  "tools": [
+    {
+      "name": "remote.echo",
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "value"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "ok"
+        ]
+      }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "mcp://remote/profile",
+      "media_type": "application/json",
+      "schema": {
+        "type": "object",
+        "required": [
+          "test:profile"
+        ]
+      }
+    }
+  ]
+}

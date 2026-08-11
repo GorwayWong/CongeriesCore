@@ -182,8 +182,8 @@ A conforming implementation demonstrates:
 ## 11. Implemented Capability Coverage
 
 The Implemented status covers the common AuthorizedDispatcher boundary and all
-v0.2 capability paths that currently exist: Skill resource reads, Tool
-invocations, ContextProvider capability and
+v0.2 capability paths that currently exist: Skill resource reads, local and
+MCP-backed Tool invocations, ContextProvider capability and
 provide calls, MemoryProvider capability and operation calls, ModelProvider
 capability, generate, and stream calls, CheckpointStore save, load, list, and
 delete calls, approval decisions, and EventSink dispatch. Their non-bypass,
@@ -191,9 +191,10 @@ default-deny, unknown-action, constraint, cross-scope audit, deadline,
 cancellation, and audit-failure behavior is covered by contract or integration
 tests.
 
-General StorageProvider and MCP contracts are not implemented by this status.
-RFC-0014 accepts the MCP Adapter composition but does not extend this coverage
-until its authorization and dual-transport conformance tests are verified. Each
-future capability must register versioned actions and reuse this boundary before
-its own delivery task may be marked Implemented. Skill and Tool grant
-constraints and execution order are defined by RFC-0013.
+MCP-backed ContextProvider calls and discovery reuse those same Tool and Context
+Actions; their default denial, invalid-grant, Scope-escape, and zero-transport-
+effect behavior is covered by RFC-0014's dual-transport suite. General
+StorageProvider contracts are not implemented by this status. Each future
+capability must register versioned actions and reuse this boundary before its
+own delivery task may be marked Implemented. Skill and Tool grant constraints
+and execution order are defined by RFC-0013.

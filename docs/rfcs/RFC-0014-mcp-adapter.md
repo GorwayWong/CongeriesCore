@@ -2,7 +2,7 @@
 
 - ID: RFC-0014
 - Title: MCP Adapter
-- Status: Accepted
+- Status: Implemented
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-12
@@ -249,4 +249,3 @@ output Schema failure; disconnect; timeout; cancellation; late response and
 task cleanup; stable Tool attempt and recovery identity; no implicit transport
 retry; acquire/drain linearization; unload during use; lease release; cleanup
 failure; and recovery after transport failure.
-

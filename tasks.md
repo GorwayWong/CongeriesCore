@@ -588,7 +588,7 @@ Acceptance:
 
 ### Task 5.3 MCP Adapter
 
-Status: In Progress (RFC-0014 Accepted)
+Status: Implemented in 0.2.0
 
 Implement capability discovery, schema mapping, Context and Tool integration,
 and policy enforcement.
@@ -653,6 +653,17 @@ Acceptance:
   Action, Schema, permission, Scope, or grant validation fails.
 - Exact fixtures, dual-transport contract tests, full pytest coverage, Ruff, and
   Pyright remain green before Task 5.3 is marked Implemented.
+
+Verification evidence:
+
+- RFC-0014 is Implemented and the exact MCP descriptor, discovery, transport
+  records, reused Action catalog, structured errors, and Core event fixtures
+  round-trip byte-for-byte.
+- One parameterized contract suite passes against independent fake stdio and
+  fake stateless Streamable HTTP transports without a process, network listener,
+  MCP SDK, or production dependency.
+- The full suite passes 260 tests with 91.22% coverage; Ruff, Pyright, and
+  `git diff --check` are green.
 
 ## 7. Phase 6: Events, Storage, Observability, and Compatibility
 
