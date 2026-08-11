@@ -1,0 +1,7 @@
+{
+  "workflow_id": "workflow-1",
+  "source_definition_id": "workflow-definition",
+  "source_graph_version": "v1",
+  "target_definition_id": "workflow-definition-v2",
+  "target_graph_version": "v2"
+}

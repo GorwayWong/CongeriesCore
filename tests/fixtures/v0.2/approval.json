@@ -1,0 +1,54 @@
+{
+  "request": {
+    "approval_id": "approval-1",
+    "run_id": "workflow-run-1",
+    "node_id": "approval-node",
+    "correlation_id": "approval-correlation",
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "allowed_outcomes": [
+      "approved",
+      "rejected"
+    ],
+    "expires_at": "2026-08-10T13:00:00+00:00",
+    "prompt_ref": {
+      "resource_type": "artifact",
+      "resource": {
+        "namespace": "core",
+        "kind": "artifact",
+        "id": "approval-prompt",
+        "owning_extension": null
+      },
+      "scope": {
+        "namespace": "core",
+        "kind": "workspace",
+        "id": "workspace-1",
+        "parent": null
+      },
+      "version": "1"
+    }
+  },
+  "decision": {
+    "approval_id": "approval-1",
+    "run_id": "workflow-run-1",
+    "node_id": "approval-node",
+    "correlation_id": "approval-correlation",
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "actor": {
+      "namespace": "core",
+      "kind": "core_service",
+      "id": "approver"
+    },
+    "outcome": "approved",
+    "decided_at": "2026-08-10T12:00:00+00:00"
+  }
+}

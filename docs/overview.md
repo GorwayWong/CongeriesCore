@@ -66,7 +66,9 @@ than becoming built-in business concepts.
 
 Workflow defines a typed node graph and execution policy. Stable node boundaries
 can be checkpointed. Recovery can replay a node, so side-effecting operations
-use idempotency keys.
+use idempotency keys. The implemented CheckpointStore contract uses an authorized
+gateway and a WorkflowRun compare-and-set marker; stored orphans are never chosen
+implicitly for recovery.
 
 ## Typical Execution Flow
 
@@ -110,23 +112,68 @@ The verified direct Agent slice includes:
   restricted fallback
 - Active deadline and cancellation propagation to Provider calls
 - Exactly one terminal Model stream event and cleanup of closable streams
-- Root AgentRun execution without a Plugin, Skill, Tool, MemoryProvider, or
-  Workflow
+- Root AgentRun execution without a Plugin, Skill, Tool, or MemoryProvider
 - Authorized Memory capability discovery, pagination, idempotent mutation,
   optional consolidation, cancellation cleanup, and redacted operation events
 - Stable v0.2 compatibility fixtures for Content, Context, Model, AgentSpec,
-  Memory, Provider actions, and Core event catalogs
+  Memory, Checkpoint, approval, Workflow, Provider actions, and Core event
+  catalogs
+- Authorized in-memory CheckpointStore, canonical integrity, marker commits,
+  migration/fallback policy, minimal restoration, and approval persistence
+- Immutable Workflow contracts, strict DAG validation, deterministic
+  one-at-a-time scheduling, AgentNode child Runs, authorized durable output
+  references, Checkpoint recovery, and ApprovalNode suspension and resumption
 
 The following remain outside this implemented slice:
 
 - Model-driven Tool execution loops
-- Workflow graph execution and checkpoint recovery
-- Approval and evaluation coordination
+- Skill, Tool, Context, Evaluation, and custom Workflow node execution
+- Parallel scheduling and external Workflow engine adapters
+- Evaluation coordination
 - Plugin lifecycle and MCP capability adapters
 
 These future capability families must reuse the implemented authorization,
 RuntimeCallContext, cancellation, error, and event boundaries before their own
 delivery tasks can be marked Implemented.
+
+## Implemented Minimal Workflow Runtime
+
+The delivered direct Workflow Runtime is deliberately smaller than a complete
+workflow engine. It validates immutable Workflow contracts before execution,
+uses a deterministic dependency scheduler, and executes AgentNode through child
+AgentRuns. Stable boundaries use CheckpointCoordinator, and recovery finishes
+restoring node state before scheduling resumes. Agent output needed after
+recovery is converted by an injected persistence boundary into typed durable
+references; raw text and JSON bodies remain outside Checkpoints.
+
+### What This Means in Practice
+
+In plain language, Core can now run a small, durable checklist of Agent steps:
+
+1. It checks the whole checklist before doing any work. A broken dependency,
+   unsupported step, incompatible schema, or unevaluable permission stops the
+   Workflow before a node or Checkpoint is created.
+2. It runs one ready step at a time in a predictable order. A step cannot start
+   until every declared prerequisite has completed successfully.
+3. Each Agent step gets its own child Run, while the parent Workflow keeps the
+   same workspace, session, cancellation signal, deadline limit, trace, and
+   stable idempotency identity.
+4. A completed step is saved only after any output needed later has a durable
+   typed reference. Checkpoints contain those references, not the raw response.
+5. After a crash, Core reloads the last committed save point. Finished steps are
+   skipped, while interrupted work may run again with the same idempotency key.
+6. An approval step creates a durable pause. Restarting does not create a second
+   request, and downstream work stays locked until an authorized decision is
+   durably recorded.
+
+This does not yet make Core a general-purpose workflow engine. It intentionally
+does not execute Skill, Tool, Context, Evaluation, or custom nodes, and it does
+not provide parallel scheduling, compensation, or an external engine adapter.
+
+ApprovalNode composes the existing durable ApprovalCoordinator. Skill, Tool,
+Context, Evaluation, custom nodes, parallel scheduling, compensation, and
+external engine adapters remain deferred. The normative delivery sequence remains
+in [tasks.md](../tasks.md).
 
 ## Extension Flow
 
@@ -150,7 +197,7 @@ and infrastructure remain replaceable through adapters and providers.
 | Scope and authorization | [RFC-0008](rfcs/RFC-0008-scope-authorization.md) |
 | ModelProvider | [RFC-0009](rfcs/RFC-0009-model-provider.md) |
 | Runtime Events | [RFC-0010](rfcs/RFC-0010-runtime-events.md) |
-| Checkpoint and recovery | [RFC-0011](rfcs/RFC-0011-checkpoint-recovery.md) |
+| Checkpoint, commit, and recovery | [RFC-0011](rfcs/RFC-0011-checkpoint-recovery.md) |
 
 Cross-cutting rationale is indexed in the [ADR Registry](adrs/README.md), and
 implementation sequencing is defined in [tasks.md](../tasks.md).

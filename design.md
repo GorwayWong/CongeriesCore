@@ -98,6 +98,15 @@ adapters.
 The normative contract is
 [RFC-0003](docs/rfcs/RFC-0003-workflow.md).
 
+The minimal direct Workflow runtime now provides immutable versioned contracts,
+pre-execution DAG validation, deterministic one-at-a-time dependency scheduling,
+AgentNode child Runs, authorized durable node-output references, checkpoint-based
+recovery, and ApprovalNode coordination. Checkpoint, Run marker, restoration,
+migration, fallback, and approval services remain independently replaceable.
+Skill, Tool, Context, Evaluation, custom node execution, parallel scheduling, and
+external engine adapters remain deferred; their delivery order is owned by
+[tasks.md](tasks.md).
+
 ## 4. Run, Session, and Workspace
 
 ### 4.1 Run Envelope
@@ -134,6 +143,11 @@ Lifecycle Command
 RunRepository is replaceable. The in-memory reference implementation protects
 compare-and-set with a process-local thread lock so competing completion and
 cancellation commands cannot both commit.
+
+For WorkflowRun, `latest_checkpoint_ref` is a compare-and-set recovery marker.
+Checkpoint Store durability precedes the marker mutation; only the marker makes
+a stored checkpoint eligible for recovery. Recovery opens a new attempt in
+RECOVERING and records the actual source reference before restoration begins.
 
 ### 4.2 SessionRef
 
@@ -233,10 +247,16 @@ persistence belong to plugins. See
 ### 6.4 Approval and Evaluation
 
 Approval pauses a Run in WAITING_APPROVAL, writes a checkpoint, emits a reliable
-audit event, and resumes only after an authorized decision.
+audit event, and resumes only after an authorized, correlated decision is
+durably captured by a second checkpoint and audit event. Approval state belongs
+to checkpoints rather than Runtime Event replay.
 
 Evaluation performs schema validation, policy checks, and quality evaluation.
 Evaluation cannot silently convert a failed or denied result into success.
+Approval coordination is implemented in the v0.2 direct Workflow runtime;
+Evaluation coordination and EvaluationNode execution remain the next harness
+gap. Their public contract must stay provider-neutral and must reuse Scope,
+RuntimeCallContext, authorization, audit, and Checkpoint boundaries.
 
 ## 7. Provider Layer
 
@@ -262,13 +282,20 @@ Core Contract -> Provider or Adapter -> External Implementation
 
 ## 8. Checkpoint and Recovery
 
-CheckpointStore atomically saves and loads stable workflow boundaries. Recovery
-uses at-least-once node execution, so a node may be replayed. Side-effecting
-operations require idempotency keys.
+CheckpointStore atomically saves, loads, lists, and deletes stable workflow
+boundaries behind AuthorizedDispatcher. Recovery uses at-least-once node
+execution, so a node may be replayed. Side-effecting operations require stable
+idempotency keys and request fingerprints.
 
 A checkpoint records graph version, sequence, node state, pending nodes,
 attempt, references to external state, idempotency data, and integrity data.
-Graph-version mismatch requires an explicit migrator.
+Canonical SHA-256 protects the complete versioned payload. Store writes become
+committed recovery points only after WorkflowRun marker compare-and-set; failed
+marker updates leave explicit orphans. Only true orphans may be deleted.
+
+Graph or definition mismatch requires an explicit, non-destructive migrator.
+Corrupt fallback is disabled by default. Migration and explicit fallback require
+reliable audit acknowledgement before their Run marker mutation.
 
 See [RFC-0011](docs/rfcs/RFC-0011-checkpoint-recovery.md).
 
@@ -280,6 +307,9 @@ two delivery classes:
 - Observability events are non-blocking.
 - Approval, authorization, and security audit events require reliable
   acknowledgement and at-least-once delivery.
+
+Checkpoint saved/failed events are observability. Approval request/decision and
+checkpoint migration/fallback authorization events are reliable audit.
 
 Audit sink failure pauses the Run by default; execution policy may fail it.
 Runtime Events do not own execution state and do not imply Event Sourcing.

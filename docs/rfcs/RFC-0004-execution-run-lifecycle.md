@@ -6,7 +6,7 @@
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
-- Updated: 2026-08-10
+- Updated: 2026-08-11
 - Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0006](../adrs/ADR-0006-run-and-session.md), [RFC-0011](RFC-0011-checkpoint-recovery.md)
 - Supersedes: None
 
@@ -42,7 +42,9 @@ Run contains:
 | `attempt_history` | Ordered records for started, completed, interrupted, or failed attempts |
 
 AgentRun adds `agent_id` and model binding reference. WorkflowRun adds
-`workflow_id`, graph version, and latest checkpoint reference.
+`workflow_id`, graph version, and latest checkpoint reference. The latest
+reference is the committed recovery marker, not merely the newest record present
+in a CheckpointStore.
 
 Either kind may be a root Run. Workflow AgentNode creates a child AgentRun.
 
@@ -121,7 +123,7 @@ the authorized decision and remaining work are recorded consistently.
 | decide approval | WAITING_APPROVAL | RUNNING, FAILED, or CANCELLED according to authorized decision and policy |
 | cancel | Any non-terminal state | CANCELLED after cancellation cleanup |
 | retry | Retryable attempt failure in a non-terminal phase | RETRYING; close the current attempt, increment attempt, then redispatch the failed phase |
-| recover | Non-terminal persisted Run after interruption | RECOVERING with incremented attempt |
+| recover | Persisted non-CREATED, non-terminal Run after interruption | RECOVERING with incremented attempt and checkpoint source |
 
 Retry and recovery are not valid after FAILED. A retryable attempt failure does
 not transition the Run through FAILED. The controller atomically records the
@@ -131,8 +133,9 @@ records the final attempt outcome and transitions the Run directly to FAILED.
 
 ## 7. Attempts
 
-Attempt begins at 1 and increments before retry or recovery dispatch. Attempt
-history records start, end, outcome, checkpoint source, and error. Attempt
+Attempt begins at 1 and increments before retry or recovery dispatch. Entering
+RECOVERING immediately opens the new attempt and records its checkpoint source.
+Attempt history records start, end, outcome, checkpoint source, and error. Attempt
 outcomes distinguish at least `SUCCEEDED`, `RETRYABLE_FAILURE`,
 `FINAL_FAILURE`, `CANCELLED`, and `INTERRUPTED`; they are not Run states.
 
@@ -155,6 +158,11 @@ may still run, but it cannot rewrite the committed terminal state.
 
 Repeated operations are idempotent when they request an already reached state,
 and return a conflict when their requested transition is no longer legal.
+
+Checkpoint commit is a Run compare-and-set mutation that changes only
+`latest_checkpoint_ref`, update time, and state version. Migration compare-and-set
+may atomically change Workflow definition identity, graph version, and marker.
+A stale marker mutation is a conflict and does not publish `checkpoint.saved`.
 
 Resume and retry redispatch atomically clear `continuation_status`. If the
 target attempt has no open AttemptRecord, the same mutation opens it. This

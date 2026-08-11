@@ -8,7 +8,7 @@ from typing import Protocol
 
 from congeries_core.runtime.control import Clock
 from congeries_core.runtime.errors import ErrorDetail
-from congeries_core.runtime.ids import RunId
+from congeries_core.runtime.ids import CheckpointRef, DefinitionId, RunId
 from congeries_core.runtime.run import (
     AuditFailureMode,
     Run,
@@ -102,8 +102,43 @@ class RunService:
             run_id, expected_version, self._machine.redispatch_retry
         )
 
-    async def recover(self, run_id: RunId, expected_version: int) -> Run:
-        return await self._apply(run_id, expected_version, self._machine.recover)
+    async def recover(
+        self,
+        run_id: RunId,
+        expected_version: int,
+        checkpoint_ref: CheckpointRef | None = None,
+    ) -> Run:
+        return await self._apply(
+            run_id,
+            expected_version,
+            lambda run, version, now: self._machine.recover(
+                run, version, now, checkpoint_ref
+            ),
+        )
+
+    async def commit_checkpoint(
+        self,
+        run_id: RunId,
+        expected_version: int,
+        checkpoint_ref: CheckpointRef,
+        expected_previous_ref: CheckpointRef | None,
+        *,
+        definition_id: DefinitionId | None = None,
+        graph_version: str | None = None,
+    ) -> Run:
+        return await self._apply(
+            run_id,
+            expected_version,
+            lambda run, version, now: self._machine.commit_checkpoint(
+                run,
+                version,
+                now,
+                checkpoint_ref,
+                expected_previous_ref,
+                definition_id=definition_id,
+                graph_version=graph_version,
+            ),
+        )
 
     async def complete(self, run_id: RunId, expected_version: int) -> Run:
         return await self._apply(run_id, expected_version, self._machine.complete)

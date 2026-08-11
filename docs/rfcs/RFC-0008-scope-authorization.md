@@ -6,7 +6,7 @@
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
-- Updated: 2026-08-10
+- Updated: 2026-08-11
 - Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0007](../adrs/ADR-0007-default-deny-scope.md), [RFC-0010](RFC-0010-runtime-events.md)
 - Supersedes: Security and isolation portions of the legacy RFC-0006 draft
 
@@ -109,6 +109,9 @@ The v0.2 protected Provider actions are:
 - `core.memory.capabilities`, `core.memory.retrieve`, `core.memory.remember`,
   `core.memory.forget`, `core.memory.consolidate`
 - `core.model.capabilities`, `core.model.generate`, `core.model.stream`
+- `core.checkpoint.save`, `core.checkpoint.load`, `core.checkpoint.list`,
+  `core.checkpoint.delete`
+- `core.approval.decide`
 
 All actions use version `1`. Context AccessRequests identify Provider resources
 and carry key and budget constraints. Model AccessRequests identify the
@@ -123,6 +126,14 @@ preserve SchemaRef while only shrinking metadata keys and maximum bytes. Forget
 grants preserve Memory identity and expected version. Consolidate grants
 preserve policy identity and selection keys. Unknown, malformed, or expanding
 Memory constraints are invalid grants and prevent Provider invocation.
+
+Checkpoint constraints are operation-specific. Save preserves Run, Workflow,
+definition, graph version, sequence, and predecessor identity. Load and delete
+preserve checkpoint and owning Run identity. List preserves Run and graph version
+and may only lower its limit. Approval decisions preserve approval, Run, node,
+correlation, and selected outcome identity. All effective Scopes remain equal to
+or narrower than requested Scope. Unknown, malformed, or expanding constraints
+are invalid grants and prevent Store or approval coordination.
 
 ## 7. Cross-Scope Access
 
@@ -173,11 +184,12 @@ A conforming implementation demonstrates:
 The Implemented status covers the common AuthorizedDispatcher boundary and all
 v0.2 capability paths that currently exist: ContextProvider capability and
 provide calls, MemoryProvider capability and operation calls, ModelProvider
-capability, generate, and stream calls, and EventSink dispatch. Their non-bypass,
+capability, generate, and stream calls, CheckpointStore save, load, list, and
+delete calls, approval decisions, and EventSink dispatch. Their non-bypass,
 default-deny, unknown-action, constraint, cross-scope audit, deadline,
 cancellation, and audit-failure behavior is covered by contract or integration
 tests.
 
-Tool, Checkpoint, Storage, and MCP contracts are not implemented by this status.
+Tool, general StorageProvider, and MCP contracts are not implemented by this status.
 Each future capability must register versioned actions and reuse this boundary
 before its own delivery task may be marked Implemented.

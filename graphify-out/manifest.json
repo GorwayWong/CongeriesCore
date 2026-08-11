@@ -1,0 +1,527 @@
+{
+  "pyproject.toml": {
+    "mtime": 1786363893.162734,
+    "ast_hash": "fb4704f340601b072ac029e1834d067d",
+    "semantic_hash": "fb4704f340601b072ac029e1834d067d"
+  },
+  "src/congeries_core/__init__.py": {
+    "mtime": 1786362389.5970109,
+    "ast_hash": "59a61d35abc847a51eaef09605d0c7ea",
+    "semantic_hash": "59a61d35abc847a51eaef09605d0c7ea"
+  },
+  "src/congeries_core/adapter/__init__.py": {
+    "mtime": 1786363336.4228466,
+    "ast_hash": "f6924c1e39943be067004b33dba74b1e",
+    "semantic_hash": "f6924c1e39943be067004b33dba74b1e"
+  },
+  "src/congeries_core/adapter/sqlite_event.py": {
+    "mtime": 1786363722.8244915,
+    "ast_hash": "98432658696b705f5aebe594c69141b9",
+    "semantic_hash": "98432658696b705f5aebe594c69141b9"
+  },
+  "src/congeries_core/checkpoint/__init__.py": {
+    "mtime": 1786362390.5902882,
+    "ast_hash": "fbea61ed791684302201114d6ca17b34",
+    "semantic_hash": "fbea61ed791684302201114d6ca17b34"
+  },
+  "src/congeries_core/event/__init__.py": {
+    "mtime": 1786363200.682885,
+    "ast_hash": "7f5cfed5634265afa55871be56b760a4",
+    "semantic_hash": "7f5cfed5634265afa55871be56b760a4"
+  },
+  "src/congeries_core/event/dispatcher.py": {
+    "mtime": 1786364304.8316982,
+    "ast_hash": "89082e85619af83a2ec5a5f2d513c52b",
+    "semantic_hash": "89082e85619af83a2ec5a5f2d513c52b"
+  },
+  "src/congeries_core/event/integration.py": {
+    "mtime": 1786369424.6737845,
+    "ast_hash": "80d0ee81b048c7f904c82b5af70dd76e",
+    "semantic_hash": "80d0ee81b048c7f904c82b5af70dd76e"
+  },
+  "src/congeries_core/event/memory.py": {
+    "mtime": 1786363395.54329,
+    "ast_hash": "4eb1d8c3052d4a44da6f867f15e68638",
+    "semantic_hash": "4eb1d8c3052d4a44da6f867f15e68638"
+  },
+  "src/congeries_core/event/model.py": {
+    "mtime": 1786374762.515775,
+    "ast_hash": "0f73ebd4f2fc4e22c7c95c03209b6891",
+    "semantic_hash": "0f73ebd4f2fc4e22c7c95c03209b6891"
+  },
+  "src/congeries_core/event/ports.py": {
+    "mtime": 1786363395.5402255,
+    "ast_hash": "c80275edb04e8f31c7fea05d69fa6d9b",
+    "semantic_hash": "c80275edb04e8f31c7fea05d69fa6d9b"
+  },
+  "src/congeries_core/event/redaction.py": {
+    "mtime": 1786363200.477034,
+    "ast_hash": "c5b64798e454b5c34e29c79dcae9248e",
+    "semantic_hash": "c5b64798e454b5c34e29c79dcae9248e"
+  },
+  "src/congeries_core/event/schema.py": {
+    "mtime": 1786374762.5793645,
+    "ast_hash": "929259f4e68c9652a8b7863908aaf9f2",
+    "semantic_hash": "929259f4e68c9652a8b7863908aaf9f2"
+  },
+  "src/congeries_core/harness/__init__.py": {
+    "mtime": 1786369424.7399375,
+    "ast_hash": "3d06ca5f7388aa1776a91113f2c5bf2f",
+    "semantic_hash": "3d06ca5f7388aa1776a91113f2c5bf2f"
+  },
+  "src/congeries_core/harness/agent.py": {
+    "mtime": 1786370412.693696,
+    "ast_hash": "c48feec8f252c640f60965b958be1e3b",
+    "semantic_hash": "c48feec8f252c640f60965b958be1e3b"
+  },
+  "src/congeries_core/plugin/__init__.py": {
+    "mtime": 1786362390.39088,
+    "ast_hash": "b5e6e64c8ffda5e9f3811081422401c8",
+    "semantic_hash": "b5e6e64c8ffda5e9f3811081422401c8"
+  },
+  "src/congeries_core/policy/__init__.py": {
+    "mtime": 1786362913.111289,
+    "ast_hash": "688a5f980ab3224487e1f431549dcc5e",
+    "semantic_hash": "688a5f980ab3224487e1f431549dcc5e"
+  },
+  "src/congeries_core/policy/authorization.py": {
+    "mtime": 1786370171.3546314,
+    "ast_hash": "f5a7d853811e97a025b1817e0b3f78a1",
+    "semantic_hash": "f5a7d853811e97a025b1817e0b3f78a1"
+  },
+  "src/congeries_core/policy/integration.py": {
+    "mtime": 1786362913.0475883,
+    "ast_hash": "62f04b6a5a2c86f809e565c217ebe52a",
+    "semantic_hash": "62f04b6a5a2c86f809e565c217ebe52a"
+  },
+  "src/congeries_core/provider/__init__.py": {
+    "mtime": 1786374983.4973996,
+    "ast_hash": "c239519bcef0d0f348386c2070631aee",
+    "semantic_hash": "c239519bcef0d0f348386c2070631aee"
+  },
+  "src/congeries_core/provider/_control.py": {
+    "mtime": 1786369717.6400137,
+    "ast_hash": "feda038662c573053442028297a0ff91",
+    "semantic_hash": "feda038662c573053442028297a0ff91"
+  },
+  "src/congeries_core/provider/context.py": {
+    "mtime": 1786371042.9633784,
+    "ast_hash": "6351935cc5534751a3eb210bfe023479",
+    "semantic_hash": "6351935cc5534751a3eb210bfe023479"
+  },
+  "src/congeries_core/provider/events.py": {
+    "mtime": 1786368969.3342462,
+    "ast_hash": "95ab0c484c37728662874c9fa8891906",
+    "semantic_hash": "95ab0c484c37728662874c9fa8891906"
+  },
+  "src/congeries_core/provider/memory.py": {
+    "mtime": 1786375950.328239,
+    "ast_hash": "e9ddc48fa77dcb7029b1719ed090ef02",
+    "semantic_hash": "e9ddc48fa77dcb7029b1719ed090ef02"
+  },
+  "src/congeries_core/provider/model.py": {
+    "mtime": 1786370979.9151874,
+    "ast_hash": "9f994fdee0dd8e2a05fba254511bbe5c",
+    "semantic_hash": "9f994fdee0dd8e2a05fba254511bbe5c"
+  },
+  "src/congeries_core/runtime/__init__.py": {
+    "mtime": 1786374762.452489,
+    "ast_hash": "be693f55e19b61482d94e5b4d094a023",
+    "semantic_hash": "be693f55e19b61482d94e5b4d094a023"
+  },
+  "src/congeries_core/runtime/codec.py": {
+    "mtime": 1786363486.1260765,
+    "ast_hash": "36918a25e375f28798cb473190a5736e",
+    "semantic_hash": "36918a25e375f28798cb473190a5736e"
+  },
+  "src/congeries_core/runtime/content.py": {
+    "mtime": 1786369473.871759,
+    "ast_hash": "558519956dd37a144ea5a4f491a037f7",
+    "semantic_hash": "558519956dd37a144ea5a4f491a037f7"
+  },
+  "src/congeries_core/runtime/context.py": {
+    "mtime": 1786363722.5037367,
+    "ast_hash": "148e2708c151525e8fc6443d4455c4ec",
+    "semantic_hash": "148e2708c151525e8fc6443d4455c4ec"
+  },
+  "src/congeries_core/runtime/control.py": {
+    "mtime": 1786369717.5775754,
+    "ast_hash": "956a9482a32b2db7d64a1ee82ebbb916",
+    "semantic_hash": "956a9482a32b2db7d64a1ee82ebbb916"
+  },
+  "src/congeries_core/runtime/errors.py": {
+    "mtime": 1786363791.9353516,
+    "ast_hash": "7070e1b085c5bc89fbf81be4556b379e",
+    "semantic_hash": "7070e1b085c5bc89fbf81be4556b379e"
+  },
+  "src/congeries_core/runtime/ids.py": {
+    "mtime": 1786374762.388609,
+    "ast_hash": "9790bcd31b06a0336cf1d9a9848cf450",
+    "semantic_hash": "9790bcd31b06a0336cf1d9a9848cf450"
+  },
+  "src/congeries_core/runtime/json_types.py": {
+    "mtime": 1786363823.775672,
+    "ast_hash": "183126ab18e9ac2bff955973f7f31208",
+    "semantic_hash": "183126ab18e9ac2bff955973f7f31208"
+  },
+  "src/congeries_core/runtime/run.py": {
+    "mtime": 1786364587.858197,
+    "ast_hash": "1dcef6d84f08518170e0368b603fb1e6",
+    "semantic_hash": "1dcef6d84f08518170e0368b603fb1e6"
+  },
+  "src/congeries_core/runtime/schema.py": {
+    "mtime": 1786368969.2058516,
+    "ast_hash": "9f2d2201b69f60f55a3f2bcd794651af",
+    "semantic_hash": "9f2d2201b69f60f55a3f2bcd794651af"
+  },
+  "src/congeries_core/runtime/scope.py": {
+    "mtime": 1786363722.5669317,
+    "ast_hash": "0fa3269819c9314e843712113e254c57",
+    "semantic_hash": "0fa3269819c9314e843712113e254c57"
+  },
+  "src/congeries_core/skill/__init__.py": {
+    "mtime": 1786362390.4562244,
+    "ast_hash": "941b9c42b137ea67b81d875bba94d1b7",
+    "semantic_hash": "941b9c42b137ea67b81d875bba94d1b7"
+  },
+  "src/congeries_core/state/__init__.py": {
+    "mtime": 1786362829.8683212,
+    "ast_hash": "4e388b1d5634c285fb591d7ddc573807",
+    "semantic_hash": "4e388b1d5634c285fb591d7ddc573807"
+  },
+  "src/congeries_core/state/repository.py": {
+    "mtime": 1786364304.7632422,
+    "ast_hash": "08406d29e9d81ce1756d831bf35fd5db",
+    "semantic_hash": "08406d29e9d81ce1756d831bf35fd5db"
+  },
+  "src/congeries_core/state/service.py": {
+    "mtime": 1786363395.5435326,
+    "ast_hash": "6a90309c4ffcb2dd3bccd99be716f724",
+    "semantic_hash": "6a90309c4ffcb2dd3bccd99be716f724"
+  },
+  "src/congeries_core/state/session.py": {
+    "mtime": 1786363395.5438974,
+    "ast_hash": "4cb838a6c02350273886e379dd3403f7",
+    "semantic_hash": "4cb838a6c02350273886e379dd3403f7"
+  },
+  "src/congeries_core/state/workspace.py": {
+    "mtime": 1786364587.9252179,
+    "ast_hash": "5b23d90eb9384d97fda4856c1fac44e4",
+    "semantic_hash": "5b23d90eb9384d97fda4856c1fac44e4"
+  },
+  "src/congeries_core/tool/__init__.py": {
+    "mtime": 1786362390.5220933,
+    "ast_hash": "f5b9759c4b5987391696b197f6dc6e11",
+    "semantic_hash": "f5b9759c4b5987391696b197f6dc6e11"
+  },
+  "src/congeries_core/workflow/__init__.py": {
+    "mtime": 1786362390.1937222,
+    "ast_hash": "fde91aaaf8b537c7dcf6861981764637",
+    "semantic_hash": "fde91aaaf8b537c7dcf6861981764637"
+  },
+  "tests/__init__.py": {
+    "mtime": 1786363893.4489202,
+    "ast_hash": "72b8bc9515f5587817379e69be7a5beb",
+    "semantic_hash": "72b8bc9515f5587817379e69be7a5beb"
+  },
+  "tests/fixtures/v0.2/agent_spec.json": {
+    "mtime": 1786375443.1798723,
+    "ast_hash": "306d5df876f16d63ced56235d91f4d93",
+    "semantic_hash": "306d5df876f16d63ced56235d91f4d93"
+  },
+  "tests/fixtures/v0.2/content.json": {
+    "mtime": 1786375442.9910436,
+    "ast_hash": "06a1cbdaa24208b0eb9d318be35fa05c",
+    "semantic_hash": "06a1cbdaa24208b0eb9d318be35fa05c"
+  },
+  "tests/fixtures/v0.2/context.json": {
+    "mtime": 1786375443.0550444,
+    "ast_hash": "518ea9f735fb88a1f6eb0fb363f44f7c",
+    "semantic_hash": "518ea9f735fb88a1f6eb0fb363f44f7c"
+  },
+  "tests/fixtures/v0.2/core_events.json": {
+    "mtime": 1786375443.3771658,
+    "ast_hash": "7eb8f5b859cf34386aab8fdea2133398",
+    "semantic_hash": "7eb8f5b859cf34386aab8fdea2133398"
+  },
+  "tests/fixtures/v0.2/memory.json": {
+    "mtime": 1786375443.2430375,
+    "ast_hash": "3446d512b6b79dd32e209d7af5cd0724",
+    "semantic_hash": "3446d512b6b79dd32e209d7af5cd0724"
+  },
+  "tests/fixtures/v0.2/model.json": {
+    "mtime": 1786375443.117074,
+    "ast_hash": "7916a257fece50b70e264956ed668710",
+    "semantic_hash": "7916a257fece50b70e264956ed668710"
+  },
+  "tests/fixtures/v0.2/provider_actions.json": {
+    "mtime": 1786375443.3119092,
+    "ast_hash": "e9a14aac2e83dcb7ffc40f7a71735e74",
+    "semantic_hash": "e9a14aac2e83dcb7ffc40f7a71735e74"
+  },
+  "tests/integration/__init__.py": {
+    "mtime": 1786364155.984852,
+    "ast_hash": "5f322e3384aa5c03f10f876b970f8e7f",
+    "semantic_hash": "5f322e3384aa5c03f10f876b970f8e7f"
+  },
+  "tests/integration/test_agent_runtime.py": {
+    "mtime": 1786370535.830366,
+    "ast_hash": "9c308e6505db0606e9e4d14799506366",
+    "semantic_hash": "9c308e6505db0606e9e4d14799506366"
+  },
+  "tests/integration/test_runtime_loop.py": {
+    "mtime": 1786364391.3946028,
+    "ast_hash": "d7264d8132a74c41118042a3ed866b8d",
+    "semantic_hash": "d7264d8132a74c41118042a3ed866b8d"
+  },
+  "tests/provider_support.py": {
+    "mtime": 1786375358.9481595,
+    "ast_hash": "07acfbbdfb7f47d78b734c99203e24cd",
+    "semantic_hash": "07acfbbdfb7f47d78b734c99203e24cd"
+  },
+  "tests/support.py": {
+    "mtime": 1786364142.3682203,
+    "ast_hash": "ebf62ec7372c6c9e5ea84b75b0597726",
+    "semantic_hash": "ebf62ec7372c6c9e5ea84b75b0597726"
+  },
+  "tests/test_authorization.py": {
+    "mtime": 1786364142.368346,
+    "ast_hash": "09b4463f298cc039d8fab10989ad9a01",
+    "semantic_hash": "09b4463f298cc039d8fab10989ad9a01"
+  },
+  "tests/test_compatibility_fixtures.py": {
+    "mtime": 1786375472.6375709,
+    "ast_hash": "4792d08ed9df7066d2879ce18d2fdd9d",
+    "semantic_hash": "4792d08ed9df7066d2879ce18d2fdd9d"
+  },
+  "tests/test_events.py": {
+    "mtime": 1786370945.2221527,
+    "ast_hash": "19043005a80836d3ad98ec01c29477eb",
+    "semantic_hash": "19043005a80836d3ad98ec01c29477eb"
+  },
+  "tests/test_provider_context.py": {
+    "mtime": 1786370900.5051935,
+    "ast_hash": "783b416d4bedaaca660dc9c3c1799014",
+    "semantic_hash": "783b416d4bedaaca660dc9c3c1799014"
+  },
+  "tests/test_provider_memory.py": {
+    "mtime": 1786375964.7368152,
+    "ast_hash": "06ff328d37dfdd53ec6ba461e587e347",
+    "semantic_hash": "06ff328d37dfdd53ec6ba461e587e347"
+  },
+  "tests/test_provider_model.py": {
+    "mtime": 1786370900.5680432,
+    "ast_hash": "0f4cee98b0ee26e960162c78e0a48743",
+    "semantic_hash": "0f4cee98b0ee26e960162c78e0a48743"
+  },
+  "tests/test_run_state.py": {
+    "mtime": 1786364606.436308,
+    "ast_hash": "4bda51be9e0f33c002b371b453a3d629",
+    "semantic_hash": "4bda51be9e0f33c002b371b453a3d629"
+  },
+  "tests/test_runtime_primitives.py": {
+    "mtime": 1786364142.368224,
+    "ast_hash": "259c87e3b3f669aeb4804c5626046a6e",
+    "semantic_hash": "259c87e3b3f669aeb4804c5626046a6e"
+  },
+  "tests/test_sqlite_event.py": {
+    "mtime": 1786364094.0674467,
+    "ast_hash": "5646ffbfdf58153d4d0a6a1e87a89186",
+    "semantic_hash": "5646ffbfdf58153d4d0a6a1e87a89186"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1786364368.7488482,
+    "ast_hash": "ed00a9822b74ab0e37649d0e3d64164f",
+    "semantic_hash": "ed00a9822b74ab0e37649d0e3d64164f"
+  },
+  ".memsearch/memory/2026-08-10.md": {
+    "mtime": 1786376760.1144085,
+    "ast_hash": "5a36512e8106d8e07603d7837176e93c",
+    "semantic_hash": "5a36512e8106d8e07603d7837176e93c"
+  },
+  ".serena/project.local.yml": {
+    "mtime": 1786346511.0063884,
+    "ast_hash": "f136e7d47205d9a758913615074760e5",
+    "semantic_hash": "f136e7d47205d9a758913615074760e5"
+  },
+  ".serena/project.yml": {
+    "mtime": 1786346511.00581,
+    "ast_hash": "2948b08159faa2cf17f6f7bb7faf55d4",
+    "semantic_hash": "2948b08159faa2cf17f6f7bb7faf55d4"
+  },
+  "README.md": {
+    "mtime": 1786365304.2687883,
+    "ast_hash": "fb8e578ba6e8f6ac4534dc2319091180",
+    "semantic_hash": "fb8e578ba6e8f6ac4534dc2319091180"
+  },
+  "agents.md": {
+    "mtime": 1786365303.9997356,
+    "ast_hash": "5180de66aba94aa05319dc5a01fa5388",
+    "semantic_hash": "5180de66aba94aa05319dc5a01fa5388"
+  },
+  "design.md": {
+    "mtime": 1786374695.5234578,
+    "ast_hash": "4fda2d4fe7d75d9558919c1fa08804a3",
+    "semantic_hash": "4fda2d4fe7d75d9558919c1fa08804a3"
+  },
+  "docs/Agent_Harness_Runtime_Core_System_Overview.md": {
+    "mtime": 1786359880.840665,
+    "ast_hash": "f40c61288b51f3d328ad2640f6cde70e",
+    "semantic_hash": "f40c61288b51f3d328ad2640f6cde70e"
+  },
+  "docs/README.md": {
+    "mtime": 1786365304.1362216,
+    "ast_hash": "0dd264e92b8bc26b75aff30c39e04a81",
+    "semantic_hash": "0dd264e92b8bc26b75aff30c39e04a81"
+  },
+  "docs/RFC-0002-Plugin-SDK-Specification.md": {
+    "mtime": 1786359880.8501067,
+    "ast_hash": "9839ef83406bbfb8631ee5a5ca6723dc",
+    "semantic_hash": "9839ef83406bbfb8631ee5a5ca6723dc"
+  },
+  "docs/RFC-0003-Workflow-Specification.md": {
+    "mtime": 1786359880.8594794,
+    "ast_hash": "261155f6537f1ecc09127eae5668f147",
+    "semantic_hash": "261155f6537f1ecc09127eae5668f147"
+  },
+  "docs/RFC-0004-Agent-Runtime-Lifecycle.md": {
+    "mtime": 1786359880.8680713,
+    "ast_hash": "efd7ea636c819fe9682ba4831b9fba33",
+    "semantic_hash": "efd7ea636c819fe9682ba4831b9fba33"
+  },
+  "docs/RFC-0005-Architecture-Decision-Records.md": {
+    "mtime": 1786359880.877946,
+    "ast_hash": "ed20948d3658d7ffb1ab13fcdf3addd6",
+    "semantic_hash": "ed20948d3658d7ffb1ab13fcdf3addd6"
+  },
+  "docs/RFC-0006-Context-and-Memory-Provider-Specification.md": {
+    "mtime": 1786371312.9911003,
+    "ast_hash": "c509c32ce3c866bc8e48f1a908c2c11b",
+    "semantic_hash": "c509c32ce3c866bc8e48f1a908c2c11b"
+  },
+  "docs/adrs/ADR-0001-workflow-engine-adapters.md": {
+    "mtime": 1786359903.5114825,
+    "ast_hash": "c71e79234fc60061875b39b632be675c",
+    "semantic_hash": "c71e79234fc60061875b39b632be675c"
+  },
+  "docs/adrs/ADR-0002-memory-provider.md": {
+    "mtime": 1786359903.5246477,
+    "ast_hash": "a074834cc450af1c63d7b9b527049726",
+    "semantic_hash": "a074834cc450af1c63d7b9b527049726"
+  },
+  "docs/adrs/ADR-0003-runtime-events-not-event-sourcing.md": {
+    "mtime": 1786359903.5304296,
+    "ast_hash": "debebc49d7ec1e0ade643fb5000bc6a0",
+    "semantic_hash": "debebc49d7ec1e0ade643fb5000bc6a0"
+  },
+  "docs/adrs/ADR-0004-workflow-first-class.md": {
+    "mtime": 1786359903.534792,
+    "ast_hash": "4346321da0e010aab31519df5b7fce56",
+    "semantic_hash": "4346321da0e010aab31519df5b7fce56"
+  },
+  "docs/adrs/ADR-0005-interface-first.md": {
+    "mtime": 1786359903.5396369,
+    "ast_hash": "9efa316012e4a135473e287bc0b0f17a",
+    "semantic_hash": "9efa316012e4a135473e287bc0b0f17a"
+  },
+  "docs/adrs/ADR-0006-run-and-session.md": {
+    "mtime": 1786359903.5439847,
+    "ast_hash": "3dc76d2f6167dc8361afe8b1b8f6093a",
+    "semantic_hash": "3dc76d2f6167dc8361afe8b1b8f6093a"
+  },
+  "docs/adrs/ADR-0007-default-deny-scope.md": {
+    "mtime": 1786359903.5476549,
+    "ast_hash": "103298b211a2c55fe35cc6493a34383b",
+    "semantic_hash": "103298b211a2c55fe35cc6493a34383b"
+  },
+  "docs/adrs/ADR-0008-at-least-once-recovery.md": {
+    "mtime": 1786359903.5526273,
+    "ast_hash": "4abd150768e52a213b3f8abefd33fe01",
+    "semantic_hash": "4abd150768e52a213b3f8abefd33fe01"
+  },
+  "docs/adrs/ADR-0009-safe-plugin-unload.md": {
+    "mtime": 1786359903.556674,
+    "ast_hash": "e0206b224ee4254c9a7a82a0ce23bdb7",
+    "semantic_hash": "e0206b224ee4254c9a7a82a0ce23bdb7"
+  },
+  "docs/adrs/README.md": {
+    "mtime": 1786359903.4959116,
+    "ast_hash": "29e5b2a4ad90c4c4550081199840e573",
+    "semantic_hash": "29e5b2a4ad90c4c4550081199840e573"
+  },
+  "docs/overview.md": {
+    "mtime": 1786374695.586025,
+    "ast_hash": "51c384674047c59ac80e8209838387eb",
+    "semantic_hash": "51c384674047c59ac80e8209838387eb"
+  },
+  "docs/rfcs/README.md": {
+    "mtime": 1786375695.1698966,
+    "ast_hash": "020c6edd41291d7ed3fddcba9d2c0387",
+    "semantic_hash": "020c6edd41291d7ed3fddcba9d2c0387"
+  },
+  "docs/rfcs/RFC-0002-plugin-sdk.md": {
+    "mtime": 1786359894.8161922,
+    "ast_hash": "0d8bb06be2e05d9ef42ee4efd9a4c506",
+    "semantic_hash": "0d8bb06be2e05d9ef42ee4efd9a4c506"
+  },
+  "docs/rfcs/RFC-0003-workflow.md": {
+    "mtime": 1786359894.8343112,
+    "ast_hash": "895544a62bbada5c58022ef4b5672ed4",
+    "semantic_hash": "895544a62bbada5c58022ef4b5672ed4"
+  },
+  "docs/rfcs/RFC-0004-execution-run-lifecycle.md": {
+    "mtime": 1786364540.4013479,
+    "ast_hash": "f20b19e8eb3711b8c4b4c9a582f98ea0",
+    "semantic_hash": "f20b19e8eb3711b8c4b4c9a582f98ea0"
+  },
+  "docs/rfcs/RFC-0005-architecture-decision-records.md": {
+    "mtime": 1786359894.8440769,
+    "ast_hash": "e6a566e0189b1b4977385ca08ef22801",
+    "semantic_hash": "e6a566e0189b1b4977385ca08ef22801"
+  },
+  "docs/rfcs/RFC-0006-context-provider.md": {
+    "mtime": 1786370708.8024316,
+    "ast_hash": "c05168123965263c42d60ae5c9ea7926",
+    "semantic_hash": "c05168123965263c42d60ae5c9ea7926"
+  },
+  "docs/rfcs/RFC-0007-memory-provider.md": {
+    "mtime": 1786375695.1118991,
+    "ast_hash": "08413c79de40b693d5d0ca5edf3c78ab",
+    "semantic_hash": "08413c79de40b693d5d0ca5edf3c78ab"
+  },
+  "docs/rfcs/RFC-0008-scope-authorization.md": {
+    "mtime": 1786374695.3993835,
+    "ast_hash": "fc04af416a10de2c1d502a85d43b82c4",
+    "semantic_hash": "fc04af416a10de2c1d502a85d43b82c4"
+  },
+  "docs/rfcs/RFC-0009-model-provider.md": {
+    "mtime": 1786370708.9380426,
+    "ast_hash": "1b357df49f0e7f128f060a52863d47dd",
+    "semantic_hash": "1b357df49f0e7f128f060a52863d47dd"
+  },
+  "docs/rfcs/RFC-0010-runtime-events.md": {
+    "mtime": 1786374695.462196,
+    "ast_hash": "259943c7483066a3ebf0103967f453a0",
+    "semantic_hash": "259943c7483066a3ebf0103967f453a0"
+  },
+  "docs/rfcs/RFC-0011-checkpoint-recovery.md": {
+    "mtime": 1786359894.8254778,
+    "ast_hash": "68cbdc8d01e7256e5d504b12ce3df1bb",
+    "semantic_hash": "68cbdc8d01e7256e5d504b12ce3df1bb"
+  },
+  "principles.md": {
+    "mtime": 1786365303.8595152,
+    "ast_hash": "49ef2f2c97ed05b9ed584a58e681679c",
+    "semantic_hash": "49ef2f2c97ed05b9ed584a58e681679c"
+  },
+  "requirements.md": {
+    "mtime": 1786365303.929126,
+    "ast_hash": "1bce2ad1c4af7f5561d13642357ee9e3",
+    "semantic_hash": "1bce2ad1c4af7f5561d13642357ee9e3"
+  },
+  "tasks.md": {
+    "mtime": 1786375920.8915634,
+    "ast_hash": "f5656b0824e97f686c82767f97e85d0b",
+    "semantic_hash": "f5656b0824e97f686c82767f97e85d0b"
+  }
+}

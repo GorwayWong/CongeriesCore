@@ -6,7 +6,7 @@
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
-- Updated: 2026-08-10
+- Updated: 2026-08-11
 - Related: [Requirements](../../requirements.md), [Design](../../design.md), [ADR-0003](../adrs/ADR-0003-runtime-events-not-event-sourcing.md), [RFC-0008](RFC-0008-scope-authorization.md)
 - Supersedes: None
 
@@ -72,6 +72,13 @@ Event retries preserve event_id and sequence.
 State transition event allocation occurs only after the state mutation commits.
 A failed stale transition emits no RunStateChanged event.
 
+`core.checkpoint.saved` is OBSERVABILITY and is allocated only after the Store
+save and Run marker compare-and-set both commit. `core.checkpoint.failed` is
+OBSERVABILITY and never represents a committed marker. Approval request and
+decision, checkpoint migration authorization, and corrupt-checkpoint fallback
+authorization are AUDIT and must be acknowledged before their protected state
+transition continues.
+
 ## 5. Event Catalog
 
 Core event types include:
@@ -96,6 +103,8 @@ Core event types include:
 - `core.memory.operation_failed`
 - `core.checkpoint.saved`
 - `core.checkpoint.failed`
+- `core.checkpoint.migration_authorized`
+- `core.checkpoint.fallback_authorized`
 - `core.artifact.created`
 - `core.plugin.lifecycle_changed`
 
@@ -148,3 +157,5 @@ A conforming implementation demonstrates:
 - At-least-once audit retry with sink deduplication.
 - Redaction before dispatch.
 - Runtime state access without event replay.
+- Checkpoint observability after marker commit and reliable approval, migration,
+  and fallback audit ordering.

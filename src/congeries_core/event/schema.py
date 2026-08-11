@@ -134,6 +134,43 @@ def core_schema_registry() -> EventSchemaRegistry:
             "destination_scope",
             "policy_version",
         ),
+        CoreEventType.CHECKPOINT_SAVED: (
+            "checkpoint_ref",
+            "sequence",
+            "graph_version",
+            "outcome",
+        ),
+        CoreEventType.CHECKPOINT_FAILED: (
+            "checkpoint_ref",
+            "sequence",
+            "error_code",
+            "category",
+            "outcome",
+        ),
+        CoreEventType.CHECKPOINT_MIGRATION_AUTHORIZED: (
+            "source_checkpoint_ref",
+            "migrated_checkpoint_ref",
+            "source_graph_version",
+            "target_graph_version",
+        ),
+        CoreEventType.CHECKPOINT_FALLBACK_AUTHORIZED: (
+            "source_checkpoint_ref",
+            "fallback_checkpoint_ref",
+            "fallback_sequence",
+        ),
+        CoreEventType.APPROVAL_REQUESTED: (
+            "approval_id",
+            "node_id",
+            "correlation_id",
+            "outcome",
+        ),
+        CoreEventType.APPROVAL_DECIDED: (
+            "approval_id",
+            "node_id",
+            "correlation_id",
+            "actor",
+            "outcome",
+        ),
     }
     for event_type in CoreEventType:
         registry.register(

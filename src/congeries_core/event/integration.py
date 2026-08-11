@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from congeries_core.checkpoint.model import (
+    ApprovalDecision,
+    ApprovalRequest,
+    Checkpoint,
+)
 from congeries_core.policy.authorization import (
     AccessRequest,
     CorePrincipalKind,
@@ -13,9 +18,10 @@ from congeries_core.policy.authorization import (
 )
 from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import CancellationToken, TraceContext
-from congeries_core.runtime.ids import PrincipalId
+from congeries_core.runtime.errors import ErrorDetail
+from congeries_core.runtime.ids import CheckpointRef, PrincipalId
 from congeries_core.runtime.json_types import JsonValue
-from congeries_core.runtime.run import RunTransition
+from congeries_core.runtime.run import RunTransition, WorkflowRun
 from congeries_core.state.service import RunEventPublisher
 
 from .dispatcher import EventDispatcher
@@ -134,3 +140,128 @@ class RuntimeEventPublisher(RunEventPublisher):
             },
         )
         await self._dispatcher.publish(event, request.context, request.principal)
+
+    async def checkpoint_saved(
+        self, checkpoint: Checkpoint, run: WorkflowRun, context: RuntimeCallContext
+    ) -> None:
+        del run
+        await self._checkpoint_event(
+            CoreEventType.CHECKPOINT_SAVED,
+            DeliveryClass.OBSERVABILITY,
+            context,
+            {
+                "checkpoint_ref": checkpoint.ref.value,
+                "sequence": checkpoint.sequence,
+                "graph_version": checkpoint.graph_version,
+                "outcome": "saved",
+            },
+        )
+
+    async def checkpoint_failed(
+        self, checkpoint: Checkpoint, error: ErrorDetail, context: RuntimeCallContext
+    ) -> None:
+        await self._checkpoint_event(
+            CoreEventType.CHECKPOINT_FAILED,
+            DeliveryClass.OBSERVABILITY,
+            context,
+            {
+                "checkpoint_ref": checkpoint.ref.value,
+                "sequence": checkpoint.sequence,
+                "error_code": error.code,
+                "category": error.category.value,
+                "outcome": "failed",
+            },
+        )
+
+    async def checkpoint_migration_authorized(
+        self,
+        source: Checkpoint,
+        migrated: Checkpoint,
+        context: RuntimeCallContext,
+    ) -> None:
+        await self._checkpoint_event(
+            CoreEventType.CHECKPOINT_MIGRATION_AUTHORIZED,
+            DeliveryClass.AUDIT,
+            context,
+            {
+                "source_checkpoint_ref": source.ref.value,
+                "migrated_checkpoint_ref": migrated.ref.value,
+                "source_graph_version": source.graph_version,
+                "target_graph_version": migrated.graph_version,
+            },
+        )
+
+    async def checkpoint_fallback_authorized(
+        self,
+        source_ref: CheckpointRef,
+        fallback: Checkpoint,
+        context: RuntimeCallContext,
+    ) -> None:
+        await self._checkpoint_event(
+            CoreEventType.CHECKPOINT_FALLBACK_AUTHORIZED,
+            DeliveryClass.AUDIT,
+            context,
+            {
+                "source_checkpoint_ref": source_ref.value,
+                "fallback_checkpoint_ref": fallback.ref.value,
+                "fallback_sequence": fallback.sequence,
+            },
+        )
+
+    async def approval_requested(
+        self, request: ApprovalRequest, context: RuntimeCallContext
+    ) -> None:
+        await self._checkpoint_event(
+            CoreEventType.APPROVAL_REQUESTED,
+            DeliveryClass.AUDIT,
+            context,
+            {
+                "approval_id": request.approval_id.value,
+                "node_id": request.node_id.value,
+                "correlation_id": request.correlation_id.value,
+                "outcome": "requested",
+            },
+        )
+
+    async def approval_decided(
+        self, decision: ApprovalDecision, context: RuntimeCallContext
+    ) -> None:
+        await self._checkpoint_event(
+            CoreEventType.APPROVAL_DECIDED,
+            DeliveryClass.AUDIT,
+            context,
+            {
+                "approval_id": decision.approval_id.value,
+                "node_id": decision.node_id.value,
+                "correlation_id": decision.correlation_id.value,
+                "actor": decision.actor.id.value,
+                "outcome": decision.outcome.value,
+            },
+            principal=decision.actor,
+        )
+
+    async def _checkpoint_event(
+        self,
+        event_type: CoreEventType,
+        delivery_class: DeliveryClass,
+        context: RuntimeCallContext,
+        payload: Mapping[str, JsonValue],
+        *,
+        principal: RuntimePrincipal | None = None,
+    ) -> None:
+        event = await self._dispatcher.create_event(
+            event_type=event_type.value,
+            schema_version="1",
+            run_id=context.run_id,
+            root_run_id=context.root_run_id,
+            parent_run_id=context.parent_run_id,
+            scope=context.scope,
+            context=context,
+            sensitivity=Sensitivity.INTERNAL,
+            delivery_class=delivery_class,
+            payload={key: PayloadField(value) for key, value in payload.items()},
+        )
+        actor = principal or RuntimePrincipal.core(
+            CorePrincipalKind.RUN, PrincipalId(context.run_id.value)
+        )
+        await self._dispatcher.publish(event, context, actor)

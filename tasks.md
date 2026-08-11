@@ -28,25 +28,95 @@ follow-up work.
 | Run, Session, and Workspace | Implemented | Run hierarchy, lifecycle, attempts, continuation, compare-and-set repository, Session lifecycle, and Workspace versioning |
 | Scope and Authorization | Implemented | Generic Scope model, default-deny AuthorizedDispatcher, audit integration, and non-bypass Context, Memory, Model, and EventSink paths |
 | Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
-| Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, and initial state repositories; approval, evaluation, checkpoint, Artifact storage, and provider-wide storage contracts remain |
+| Execution Harness and Storage | In Progress | RunService lifecycle coordination, active Provider-call cancellation, authorized CheckpointStore, recovery and approval persistence; evaluation, Artifact storage, and provider-wide storage contracts remain |
 | Context, Memory, Model, and direct Agent execution | Implemented | Authorized Context resolution, independent Memory operations, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
-| Workflow, Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
+| Workflow | In Progress | Minimal direct runtime with versioned contracts, DAG validation, AgentNode child Runs, durable output references, checkpoint recovery, ApprovalNode, and exact fixtures; remaining node catalog and engine adapters are deferred |
+| Plugins, Tools, and MCP | Not Started | Importable package boundaries or normative contracts only |
 
-### 1.3 Next Recommended Milestone
+### 1.3 Current Workflow Milestone
 
-The next milestone is **Workflow reliability prerequisites and remaining
-compatibility coverage**. Deliver it in this dependency order:
+The delivered milestone is a **minimal direct Workflow Runtime**. It is a
+deliberately narrow Task 4.1 slice and followed this dependency order:
 
-1. Define the CheckpointStore contract and graph-version migration boundary in
-   Task 4.2 before executing Workflow graphs.
-2. Implement approval persistence and recovery semantics needed by Task 4.3.
-3. Continue Task 6.3 with fixtures for Plugin manifests, Checkpoints, and future
-   storage contracts as those public schemas become implemented.
-4. Begin direct Workflow graph execution only after checkpoint and approval
-   boundaries preserve the existing Run reliability contract.
+1. Implement immutable Workflow definition, node, dependency, policy, context,
+   result, and durable node-output reference contracts with exact v0.2
+   compatibility fixtures. Raw Agent output bodies never enter Checkpoints.
+2. Validate schema identities, node uniqueness, dependencies, the DAG, required
+   outputs, declared permissions, and supported node contracts before execution.
+3. Add deterministic dependency scheduling. The first implementation may limit
+   concurrency to one, but it must dispatch only nodes whose dependencies and
+   policy conditions are satisfied.
+4. Support AgentNode first. Each dispatch creates a child AgentRun and propagates
+   Run relationships, Scope, deadline, cancellation, trace, and idempotency.
+5. Commit the workflow-start and stable AgentNode boundaries through
+   CheckpointCoordinator. Recovery must restore node outcomes, pending work, and
+   side-effect keys before scheduling resumes.
+6. Add ApprovalNode next by composing the implemented ApprovalCoordinator.
+
+SkillNode, ToolNode, ContextNode, EvaluationNode, custom node extensions, and
+external Workflow engine adapters remain outside this first slice. Unsupported
+node types are rejected during validation rather than skipped at runtime.
+
+Task 6.3 now includes exact Workflow fixtures for the delivered public schemas.
 
 Tool and MCP tasks must register their actions and reuse the implemented
 AuthorizedDispatcher boundary before they may be marked Implemented.
+
+### 1.4 Next Recommended Milestone
+
+The next milestone should close the remaining **Task 4.3 Evaluation pipeline**
+before starting Plugin, Tool, MCP, general storage, or external Workflow engine
+work. This is the smallest unfinished control-plane slice and builds directly on
+the implemented SchemaRegistry, AuthorizedDispatcher, RuntimeCallContext,
+Runtime Events, durable output references, and Checkpoint recovery.
+
+Recommended delivery order:
+
+1. Freeze the Evaluation contract in an owning RFC before implementation. Define
+   versioned request, typed verdict/result, evidence references, evaluator
+   capability, error, audit/redaction, idempotency, and checkpoint semantics.
+   Keep evaluation-policy semantics distinct from access authorization rather
+   than overloading AuthorizationPolicy.
+2. Implement pure schema evaluation first. Schema mismatch produces a structured
+   failed verdict and cannot create a successful output or stable success
+   Checkpoint.
+3. Add an injected, authorized evaluation-policy boundary. A denied or failed
+   input remains denied or failed; later evaluators cannot upgrade it to success.
+4. Add a replaceable quality evaluator with typed results and durable evidence
+   references. Core coordinates evaluation but does not embed vendor scoring,
+   domain rubrics, or business quality rules.
+5. Compose the evaluators in a deterministic Evaluation harness with explicit
+   precedence, Scope, deadline, cancellation, trace, idempotency, and redacted
+   auditable events.
+6. Enable EvaluationNode only after the standalone harness passes. Reuse the
+   existing Workflow output-persistence and Checkpoint boundaries, and unlock
+   downstream nodes only after a stable successful verdict.
+7. Add exact fixtures, failure-path unit tests, Workflow integration tests, and
+   documentation synchronization before changing task or RFC status.
+
+Evaluation milestone acceptance:
+
+- Unknown contract versions and invalid schemas fail before evaluator dispatch.
+- Every external evaluation call is authorized and receives RuntimeCallContext.
+- Schema mismatch, policy denial, and quality failure remain distinct typed
+  outcomes and never become terminal success.
+- Deadline and cancellation stop active evaluator work and discard late results.
+- Audit events expose verdict metadata and references without raw evaluated
+  content.
+- EvaluationNode failure or denial does not unlock downstream Workflow nodes.
+- A successful EvaluationNode persists any required output or evidence reference
+  before its stable Checkpoint; recovery skips that committed evaluation.
+- In-memory fakes demonstrate identical outcomes through replaceable evaluator
+  implementations, and the full coverage, Ruff, and Pyright gates remain green.
+
+Deferred until this milestone passes:
+
+- Plugin SDK lifecycle and safe unload
+- Skill and Tool registries and execution loops
+- MCP adapters
+- Remaining Workflow node types, custom registration, parallel scheduling,
+  compensation, and external engine adapters
+- General Artifact, Workspace, and StorageProvider contracts
 
 ## 2. Phase 1: Architecture Baseline and Core Types
 
@@ -141,7 +211,7 @@ Delivered:
 - Non-bypass, unknown-action, cancellation, deadline, invalid-grant, and
   audit-failure integration coverage
 
-Future Tool, Checkpoint, Storage, and MCP tasks must register actions and reuse
+Future Tool, Storage, and MCP tasks must register actions and reuse
 this boundary before their individual task status becomes Implemented.
 
 Implement ScopeRef, runtime principals, AccessRequest, PolicyDecision, and
@@ -253,25 +323,81 @@ Acceptance:
 
 ### Task 4.1 Workflow Runtime
 
-Status: Not Started
+Status: In Progress
 
 Implement Workflow definition, input and output schemas, graph validation,
 ExecutionPolicy, WorkflowContext, WorkflowResult, and Agent, Skill, Tool,
 Context, Approval, and Evaluation nodes.
 
+First delivery slice:
+
+- Immutable and explicitly serializable Workflow definition, node, dependency,
+  policy, context, and result contracts
+- An injected boundary that turns node output needed after recovery into typed,
+  scoped durable references; the first slice selects no mandatory Artifact or
+  storage implementation
+- Validation before execution, including acyclic dependencies and supported node
+  contracts
+- Deterministic direct dependency scheduler with AgentNode as the first executable
+  node type
+- Child AgentRun creation with inherited runtime control boundaries
+- CheckpointCoordinator commits at workflow start and stable node outcomes
+- RecoveryCoordinator restoration before the scheduler can dispatch further work
+- ApprovalNode integration only after AgentNode checkpoint recovery passes
+
+Delivered in the first slice:
+
+- Frozen, strictly serialized v1 Workflow definition, node, dependency, policy,
+  context, terminal result, and approval suspension contracts
+- Exact v0.2 Workflow definition, context, terminal result, suspension, and action
+  catalog fixtures
+- Pure DAG validation with exact SchemaRef compatibility and zero execution or
+  Checkpoint effects on validation failure
+- Deterministic one-at-a-time dependency scheduling
+- Authorized AgentNode execution through child AgentRuns and typed, scoped,
+  durable output references
+- Workflow-start and stable node Checkpoints, marker-based recovery, stable-node
+  skipping, and interrupted-node replay with stable idempotency keys
+- ApprovalNode waiting, restart reconstruction, authorized decisions, and
+  downstream resumption through the existing ApprovalCoordinator
+
+Deferred from the first slice:
+
+- SkillNode, ToolNode, ContextNode, and EvaluationNode execution
+- Custom node registration and capability discovery
+- External Workflow engine adapters and distributed scheduling
+
 Acceptance:
 
 - Invalid graphs and schemas fail before execution.
 - Independent nodes execute only when dependency and policy rules allow.
+- Unsupported node contracts fail validation rather than being ignored.
+- AgentNode creates a child AgentRun with correct parent and root relationships.
+- A checkpointed AgentNode cannot become stable until output required by later
+  nodes or recovery has a durable reference.
+- Stable node outcomes are not re-executed after recovery; interrupted work may
+  replay with the same side-effect idempotency identity.
+- Recovery restoration completes before dependency scheduling resumes.
 - Workflow engines can be replaced through an adapter contract.
 - No predefined business workflow exists in Core.
 
 ### Task 4.2 CheckpointStore and Recovery
 
-Status: Not Started
+Status: Implemented in 0.2.0
 
 Implement atomic save, load, list, and delete; stable node boundaries; graph
 version validation; recovery attempts; and checkpoint migration hooks.
+
+Delivered:
+
+- Versioned immutable Checkpoint, approval, side-effect, query, page, deletion,
+  migration, and recovery contracts with canonical SHA-256 integrity
+- Authorized CheckpointStore gateway and thread-safe in-memory adapter
+- WorkflowRun marker compare-and-set, explicit orphan semantics, and protected
+  orphan-only deletion
+- Non-destructive migration, explicit audited corruption fallback, and minimal
+  restoration with recovery attempt source tracking
+- Durable pre- and post-approval checkpoint boundaries
 
 Failure scenarios:
 
@@ -300,12 +426,13 @@ Delivered:
 - Deadline and cancellation primitives propagated by RuntimeCallContext
 - Active Context, Memory, and Model Provider calls are cancelled while Core
   awaits them; late results and post-terminal stream events are discarded
+- Authorized approval request/decision coordination with durable pre- and
+  post-decision checkpoints
+- Checkpoint-based recovery coordination and attempt source tracking
 
 Remaining:
 
-- Approval request and authorized decision handling
 - Schema, policy, and quality evaluation pipelines
-- Checkpoint coordination around recovery and approval boundaries
 
 Implement pause, resume, cancellation, retry, recovery, approval decisions,
 schema validation, policy checking, and quality evaluation.
@@ -393,10 +520,11 @@ Delivered:
 - Versioned WorkspaceState updates
 - Replaceable EventSequenceStore and AuditOutbox with in-memory and SQLite
   adapters
+- Authorized CheckpointStore contract and thread-safe in-memory adapter
 
 Remaining:
 
-- Workspace, Artifact, and Checkpoint repository contracts
+- Workspace and Artifact repository contracts
 - StorageProvider boundary and authorization for all state access
 - Common contract tests shared by in-memory and external adapters
 - Standard storage failure mapping and compatibility fixtures
@@ -417,13 +545,14 @@ Status: In Progress
 Delivered:
 
 - Stable v0.2 JSON fixtures for Content, ContextBinding, ModelBinding, AgentSpec,
-  Memory contracts, the Provider action catalog, and the Core event catalog
+  Memory, Checkpoint, approval, and Workflow contracts, plus Provider, Checkpoint,
+  and Workflow action catalogs and the Core event catalog
 - Exact deserialize, equality, and reserialize checks for delivered fixtures
 
 Remaining:
 
-- Plugin manifest, Checkpoint, Workflow, and storage contract fixtures after
-  those public schemas are implemented
+- Plugin manifest and storage contract fixtures after those public schemas are
+  implemented
 - Migration fixtures and compatibility checks for future contract versions
 
 Add compatibility fixtures for public schemas, provider contracts, plugin

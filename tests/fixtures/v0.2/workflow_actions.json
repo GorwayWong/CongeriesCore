@@ -1,0 +1,17 @@
+[
+  {
+    "namespace": "core",
+    "name": "workflow.node.execute",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "workflow.output.persist",
+    "version": "1"
+  },
+  {
+    "namespace": "core",
+    "name": "workflow.output.load",
+    "version": "1"
+  }
+]

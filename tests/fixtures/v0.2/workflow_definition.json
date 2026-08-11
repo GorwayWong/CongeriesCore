@@ -1,0 +1,86 @@
+{
+  "contract_version": "1",
+  "workflow_id": "workflow-1",
+  "definition_id": "workflow-definition-1",
+  "version": "1",
+  "input_schema": {
+    "namespace": "test",
+    "name": "workflow_value",
+    "version": "1"
+  },
+  "nodes": [
+    {
+      "node_id": "agent-a",
+      "node_type": "agent",
+      "contract_version": "1",
+      "input_schema": {
+        "namespace": "test",
+        "name": "workflow_value",
+        "version": "1"
+      },
+      "input_bindings": [
+        {
+          "source": "workflow_input",
+          "source_node_id": null
+        }
+      ],
+      "output_schema": {
+        "namespace": "test",
+        "name": "workflow_value",
+        "version": "1"
+      },
+      "scope": {
+        "namespace": "core",
+        "kind": "run",
+        "id": "node-agent-a",
+        "parent": {
+          "namespace": "core",
+          "kind": "workspace",
+          "id": "workspace-1",
+          "parent": null
+        }
+      },
+      "permissions": [
+        {
+          "action": {
+            "namespace": "core",
+            "name": "workflow.node.execute",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "workflow_node",
+            "id": "agent-a",
+            "owning_extension": null
+          }
+        }
+      ],
+      "timeout_seconds": 30,
+      "retry_limit": 0,
+      "side_effecting": true,
+      "idempotency_required": true,
+      "checkpoint": true,
+      "config": {
+        "agent_id": "agent-a",
+        "definition_id": "agent-definition-a",
+        "model_binding_ref": "model-1"
+      }
+    }
+  ],
+  "dependencies": [],
+  "output_schema": {
+    "namespace": "test",
+    "name": "workflow_value",
+    "version": "1"
+  },
+  "output_binding": {
+    "source_node_id": "agent-a",
+    "required": true
+  },
+  "execution_policy": {
+    "max_concurrency": 1,
+    "failure_mode": "fail_fast",
+    "compensation_enabled": false,
+    "max_attempts": 1
+  }
+}

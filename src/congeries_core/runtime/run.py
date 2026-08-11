@@ -270,7 +270,9 @@ class Run:
                 RunStatus.RUNNING,
             }
             if self.status is RunStatus.PAUSED:
-                allowed_continuations.add(RunStatus.WAITING_APPROVAL)
+                allowed_continuations.update(
+                    {RunStatus.WAITING_APPROVAL, RunStatus.RECOVERING}
+                )
             if self.continuation_status not in allowed_continuations:
                 raise ValueError("continuation_status is not a resumable phase")
         elif self.continuation_status is not None:
@@ -674,7 +676,7 @@ class RunStateMachine:
             self._illegal(run, RunStatus.PAUSED)
         continuation = run.continuation_status
         if run.status is RunStatus.RECOVERING:
-            continuation = RunStatus.RUNNING
+            continuation = RunStatus.RECOVERING
         elif run.status is not RunStatus.RETRYING:
             continuation = run.status
         current = self._replace(
@@ -747,20 +749,106 @@ class RunStateMachine:
         )
         return RunTransition(run, current, "retry_redispatch")
 
-    def recover(self, run: Run, expected_version: int, now: datetime) -> RunTransition:
+    def recover(
+        self,
+        run: Run,
+        expected_version: int,
+        now: datetime,
+        checkpoint_ref: CheckpointRef | None = None,
+    ) -> RunTransition:
         self._check_version(run, expected_version)
+        source = checkpoint_ref
+        if isinstance(run, WorkflowRun):
+            source = source or run.latest_checkpoint_ref
+            if source is None:
+                raise core_error(
+                    ErrorCategory.INVALID_REQUEST,
+                    "missing_recovery_checkpoint",
+                    "Workflow recovery requires a committed checkpoint marker",
+                )
+        if run.status is RunStatus.RECOVERING:
+            current_source = (
+                run.attempt_history[-1].checkpoint_ref
+                if run.attempt_history and run.attempt_history[-1].open
+                else None
+            )
+            if current_source == source:
+                return RunTransition(run, run, "recover_idempotent")
+            raise core_error(
+                ErrorCategory.CONFLICT,
+                "recovery_source_conflict",
+                "Run is already recovering from a different checkpoint",
+            )
         if run.status.terminal or run.status is RunStatus.CREATED:
             self._illegal(run, RunStatus.RECOVERING)
         history = self._close_attempt(run, now, AttemptOutcome.INTERRUPTED)
+        new_attempt = run.attempt + 1
         current = self._replace(
             run,
             now,
             status=RunStatus.RECOVERING,
-            attempt=run.attempt + 1,
+            attempt=new_attempt,
             continuation_status=None,
-            attempt_history=history,
+            attempt_history=(
+                *history,
+                AttemptRecord(new_attempt, now, checkpoint_ref=source),
+            ),
         )
         return RunTransition(run, current, "recover")
+
+    def commit_checkpoint(
+        self,
+        run: Run,
+        expected_version: int,
+        now: datetime,
+        checkpoint_ref: CheckpointRef,
+        expected_previous_ref: CheckpointRef | None,
+        *,
+        definition_id: DefinitionId | None = None,
+        graph_version: str | None = None,
+    ) -> RunTransition:
+        self._check_version(run, expected_version)
+        if not isinstance(run, WorkflowRun):
+            raise core_error(
+                ErrorCategory.INVALID_REQUEST,
+                "checkpoint_requires_workflow_run",
+                "only WorkflowRun may commit a checkpoint",
+            )
+        if run.status.terminal:
+            raise core_error(
+                ErrorCategory.CONFLICT,
+                "terminal_checkpoint_commit",
+                "terminal WorkflowRun cannot advance its checkpoint marker",
+            )
+        target_definition = definition_id or run.definition_id
+        target_graph_version = graph_version or run.graph_version
+        if (
+            run.latest_checkpoint_ref == checkpoint_ref
+            and run.definition_id == target_definition
+            and run.graph_version == target_graph_version
+        ):
+            return RunTransition(run, run, "checkpoint_commit_idempotent")
+        if run.latest_checkpoint_ref != expected_previous_ref:
+            raise core_error(
+                ErrorCategory.CONFLICT,
+                "stale_checkpoint_marker",
+                "WorkflowRun checkpoint marker does not match the expected reference",
+                retryable=True,
+            )
+        current = self._replace(
+            run,
+            now,
+            definition_id=target_definition,
+            graph_version=target_graph_version,
+            latest_checkpoint_ref=checkpoint_ref,
+        )
+        reason = (
+            "checkpoint_migration_commit"
+            if target_definition != run.definition_id
+            or target_graph_version != run.graph_version
+            else "checkpoint_commit"
+        )
+        return RunTransition(run, current, reason)
 
     def complete(self, run: Run, expected_version: int, now: datetime) -> RunTransition:
         self._check_version(run, expected_version)

@@ -1,0 +1,71 @@
+{
+  "run": {
+    "run_id": "workflow-run-1",
+    "kind": "workflow",
+    "definition_id": "workflow-definition-1",
+    "root_run_id": "workflow-run-1",
+    "parent_run_id": null,
+    "workspace_id": "workspace-1",
+    "session_ref": {
+      "namespace": "test",
+      "session_id": "session-1"
+    },
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "status": "waiting_approval",
+    "attempt": 1,
+    "state_version": 6,
+    "created_at": "2026-08-10T12:00:00+00:00",
+    "started_at": "2026-08-10T12:00:00+00:00",
+    "updated_at": "2026-08-10T12:00:00+00:00",
+    "ended_at": null,
+    "error_summary": null,
+    "continuation_status": null,
+    "attempt_history": [],
+    "control_policy": {
+      "audit_failure_mode": "pause"
+    },
+    "workflow_id": "workflow-1",
+    "graph_version": "1",
+    "latest_checkpoint_ref": "checkpoint-approval"
+  },
+  "checkpoint_ref": "checkpoint-approval",
+  "approval": {
+    "approval_id": "approval-1",
+    "run_id": "workflow-run-1",
+    "node_id": "approval-node",
+    "correlation_id": "approval-correlation",
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "allowed_outcomes": [
+      "approved",
+      "rejected",
+      "cancelled"
+    ],
+    "expires_at": "2026-08-10T13:00:00+00:00",
+    "prompt_ref": {
+      "resource_type": "approval_prompt",
+      "resource": {
+        "namespace": "core",
+        "kind": "approval_prompt",
+        "id": "prompt-1",
+        "owning_extension": null
+      },
+      "scope": {
+        "namespace": "core",
+        "kind": "workspace",
+        "id": "workspace-1",
+        "parent": null
+      },
+      "version": "1"
+    }
+  }
+}

@@ -19,6 +19,8 @@
   "core.authorization.cross_scope_granted",
   "core.checkpoint.saved",
   "core.checkpoint.failed",
+  "core.checkpoint.migration_authorized",
+  "core.checkpoint.fallback_authorized",
   "core.artifact.created",
   "core.plugin.lifecycle_changed"
 ]

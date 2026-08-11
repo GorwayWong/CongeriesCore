@@ -4,6 +4,13 @@ import json
 from pathlib import Path
 from typing import cast
 
+from congeries_core.checkpoint import (
+    ApprovalCheckpointState,
+    Checkpoint,
+    CheckpointMigrationRequest,
+    CheckpointPage,
+    checkpoint_actions,
+)
 from congeries_core.event.model import CoreEventType
 from congeries_core.harness.agent import AgentSpec
 from congeries_core.policy.authorization import ActionRef
@@ -18,6 +25,13 @@ from congeries_core.provider.memory import (
 from congeries_core.provider.model import ModelBinding
 from congeries_core.runtime.content import ContentBlock
 from congeries_core.runtime.json_types import as_array, as_object
+from congeries_core.workflow import (
+    WorkflowContext,
+    WorkflowDefinition,
+    WorkflowResult,
+    WorkflowSuspension,
+    workflow_actions,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "v0.2"
 
@@ -96,3 +110,60 @@ def test_provider_action_and_core_event_catalog_v02_fixtures() -> None:
     events = [event.value for event in CoreEventType]
     assert event_values == events
     assert _serialized(events) == _text("core_events.json")
+
+
+def test_checkpoint_approval_migration_and_action_v02_fixtures() -> None:
+    checkpoint = Checkpoint.from_data(_object("checkpoint.json"))
+    assert Checkpoint.from_data(checkpoint.to_data()) == checkpoint
+    assert checkpoint.integrity.digest == (
+        "afbd705286dccefe8d1aa243183c3ae0023f25525ae211e1a5d04847719f7967"
+    )
+    assert _serialized(checkpoint.to_data()) == _text("checkpoint.json")
+
+    page = CheckpointPage.from_data(_object("checkpoint_page.json"))
+    assert CheckpointPage.from_data(page.to_data()) == page
+    assert _serialized(page.to_data()) == _text("checkpoint_page.json")
+
+    migration = CheckpointMigrationRequest.from_data(
+        _object("checkpoint_migration.json")
+    )
+    assert CheckpointMigrationRequest.from_data(migration.to_data()) == migration
+    assert _serialized(migration.to_data()) == _text("checkpoint_migration.json")
+
+    approval = ApprovalCheckpointState.from_data(_object("approval.json"))
+    assert ApprovalCheckpointState.from_data(approval.to_data()) == approval
+    assert _serialized(approval.to_data()) == _text("approval.json")
+
+    values = as_array(
+        json.loads(_text("checkpoint_actions.json")), "Checkpoint action fixture"
+    )
+    actions = tuple(
+        ActionRef.from_data(as_object(item, "Checkpoint action")) for item in values
+    )
+    assert actions == checkpoint_actions()
+    assert _serialized([action.to_data() for action in actions]) == _text(
+        "checkpoint_actions.json"
+    )
+
+
+def test_workflow_v02_fixtures_round_trip_exactly() -> None:
+    for name, contract in (
+        ("workflow_definition.json", WorkflowDefinition),
+        ("workflow_context.json", WorkflowContext),
+        ("workflow_result.json", WorkflowResult),
+        ("workflow_suspension.json", WorkflowSuspension),
+    ):
+        value = contract.from_data(_object(name))
+        assert contract.from_data(value.to_data()) == value
+        assert _serialized(value.to_data()) == _text(name)
+
+    values = as_array(
+        json.loads(_text("workflow_actions.json")), "Workflow action fixture"
+    )
+    actions = tuple(
+        ActionRef.from_data(as_object(item, "Workflow action")) for item in values
+    )
+    assert actions == workflow_actions()
+    assert _serialized([action.to_data() for action in actions]) == _text(
+        "workflow_actions.json"
+    )

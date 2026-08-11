@@ -53,6 +53,14 @@ class WorkflowId(Identifier):
     """Workflow identity."""
 
 
+class NodeId(Identifier):
+    """Workflow node identity."""
+
+
+class ApprovalId(Identifier):
+    """Workflow approval identity."""
+
+
 class ModelBindingRef(Identifier):
     """Registered model binding reference."""
 

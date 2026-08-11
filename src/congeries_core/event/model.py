@@ -68,6 +68,8 @@ class CoreEventType(StrEnum):
     AUTHORIZATION_CROSS_SCOPE_GRANTED = "core.authorization.cross_scope_granted"
     CHECKPOINT_SAVED = "core.checkpoint.saved"
     CHECKPOINT_FAILED = "core.checkpoint.failed"
+    CHECKPOINT_MIGRATION_AUTHORIZED = "core.checkpoint.migration_authorized"
+    CHECKPOINT_FALLBACK_AUTHORIZED = "core.checkpoint.fallback_authorized"
     ARTIFACT_CREATED = "core.artifact.created"
     PLUGIN_LIFECYCLE_CHANGED = "core.plugin.lifecycle_changed"
 
