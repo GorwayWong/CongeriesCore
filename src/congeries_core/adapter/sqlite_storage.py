@@ -153,12 +153,16 @@ class SqliteStorageProvider:
         if self._initialized:
             return
         async with self._initialize_lock:
+            # Double-check inside the lock so concurrent first calls create the
+            # schema once without serializing every later operation.
             if not self._initialized:
                 await self._run(self._initialize_sync)
                 self._initialized = True
 
     async def _run(self, operation: Callable[..., object], *args: object) -> object:
         try:
+            # sqlite3 is synchronous. Moving each short transaction to a worker
+            # thread keeps the async Provider contract from blocking the runtime.
             return await asyncio.to_thread(operation, *args)
         except CoreError:
             raise
@@ -177,6 +181,8 @@ class SqliteStorageProvider:
             isolation_level=None,
         )
         connection.row_factory = sqlite3.Row
+        # WAL permits readers alongside a writer; busy_timeout turns brief lock
+        # contention into bounded waiting; foreign_keys protects Artifact owners.
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute(f"PRAGMA busy_timeout={int(self._timeout * 1000)}")
         connection.execute("PRAGMA foreign_keys=ON")
@@ -258,6 +264,9 @@ class SqliteStorageProvider:
         self, workspace: WorkspaceState, expected_version: int
     ) -> WorkspaceState:
         with self._connect() as connection:
+            # BEGIN IMMEDIATE reserves the write slot before reading the version.
+            # The WHERE state_version predicate remains a second race check and
+            # makes the intended CAS visible to reviewers and other adapters.
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """
@@ -322,6 +331,8 @@ class SqliteStorageProvider:
     def _put_artifact_sync(self, value: ArtifactValue) -> ArtifactRecord:
         record = value.record
         with self._connect() as connection:
+            # Workspace validation, idempotency comparison, and insertion share
+            # one transaction. Any failure rolls back before bytes become visible.
             connection.execute("BEGIN IMMEDIATE")
             workspace = connection.execute(
                 """
@@ -363,6 +374,8 @@ class SqliteStorageProvider:
                     bytes(existing["content"]),
                 )
                 if stored == value:
+                    # Exact replay is success; changed content under the same ID
+                    # is rejected below. Version 1 has no update operation.
                     connection.commit()
                     return stored.record
                 connection.rollback()
@@ -423,6 +436,8 @@ class SqliteStorageProvider:
             params.extend(
                 [created_at, created_at, query.cursor.before_artifact_id.value]
             )
+        # Fetch one extra row to decide whether to issue a cursor without a count
+        # query or offset scan. The composite index matches this exact ordering.
         params.append(query.limit + 1)
         statement = f"""
             SELECT record_json FROM storage_artifacts

@@ -22,6 +22,23 @@ RunRepository, SessionRepository, CheckpointStore, or Workflow behavior. Artifac
 updates, deletion, garbage collection, retention, and migration are outside
 version 1 because Checkpoints and Workflows may hold durable Artifact references.
 
+### 1.1 Plain-language model
+
+Think of a Workspace as a shared notebook with a revision number on its cover.
+A writer must say which revision it read. If another writer has already changed
+the notebook, the old writer is stopped instead of overwriting newer work.
+
+Think of an Artifact as a sealed package. The label contains its stable ID,
+owner, byte count, and SHA-256. Sending the exact same package again is safe;
+putting different bytes under the same ID is rejected. Version 1 deliberately
+has no eraser: update, delete, and garbage collection need a later retention and
+migration contract because durable Checkpoints may still point at the package.
+
+StorageGateway is the guarded front desk. It checks the caller, action, Scope,
+Workspace, and immutable request details before selecting a Provider. The
+in-memory and SQLite Providers are two different filing cabinets behind that
+same desk; applications can replace either without changing the public form.
+
 ## 2. Ownership and Boundaries
 
 Core owns transport-neutral values, repository protocols, StorageProvider,
@@ -265,3 +282,7 @@ StorageProviderRegistry, StorageGateway, the in-memory Provider, the SQLite
 reference Provider, normalized events and schemas, a shared dual-adapter suite,
 authorization and failure-path tests, restart and transaction checks, and exact
 version 1 compatibility fixtures. Workflow node execution is unchanged.
+
+For a symbol-by-symbol review route, operation traces, risk map, and test
+cross-reference, see the
+[Storage v1 Code Review Guide](../reviews/task-6.2-storage-code-review.md).

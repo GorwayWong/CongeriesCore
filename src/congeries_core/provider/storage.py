@@ -147,6 +147,8 @@ class StorageCapabilities:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactRecord:
+    """Immutable Artifact identity and integrity metadata; never the content body."""
+
     provider_id: ProviderId
     artifact_id: ArtifactId
     workspace_id: WorkspaceId
@@ -234,6 +236,8 @@ class ArtifactRecord:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactValue:
+    """One Artifact record paired with the exact bytes covered by its digest."""
+
     record: ArtifactRecord
     content: bytes
 
@@ -261,6 +265,9 @@ class ArtifactValue:
             content = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError) as error:
             raise ValueError("Artifact content_base64 is invalid") from error
+        # validate=True rejects invalid characters, while this round-trip check
+        # also rejects alternate encodings with non-zero padding bits. One byte
+        # sequence therefore has one stable public wire representation.
         if base64.b64encode(content).decode("ascii") != encoded:
             raise ValueError("Artifact content_base64 is not canonical")
         return cls(
@@ -271,6 +278,8 @@ class ArtifactValue:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactReference:
+    """Durable identity safe for checkpoints because it excludes bytes and metadata."""
+
     provider_id: ProviderId
     artifact_id: ArtifactId
     workspace_id: WorkspaceId
@@ -333,6 +342,8 @@ class ArtifactReference:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactCursor:
+    """Opaque keyset boundary bound to one exact scoped Artifact query."""
+
     provider_id: ProviderId
     workspace_id: WorkspaceId
     scope: ScopeRef
@@ -400,6 +411,8 @@ class ArtifactCursor:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactQuery:
+    """A scoped metadata-only query; Artifact bytes are never returned by list."""
+
     provider_id: ProviderId
     workspace_id: WorkspaceId
     scope: ScopeRef
@@ -416,6 +429,9 @@ class ArtifactQuery:
 
     @property
     def query_fingerprint(self) -> str:
+        # The limit is carried separately by ArtifactCursor because policy may
+        # narrow it on the first page. Provider, Workspace, and Scope form the
+        # immutable query identity that a cursor must never escape.
         payload = {
             "provider_id": self.provider_id.value,
             "workspace_id": self.workspace_id.value,
@@ -465,6 +481,8 @@ class ArtifactQuery:
 
 @dataclass(frozen=True, slots=True)
 class ArtifactPage:
+    """One ordered page of Artifact metadata plus an optional continuation."""
+
     items: tuple[ArtifactRecord, ...]
     next_cursor: ArtifactCursor | None
     contract_version: str = "1"
@@ -504,6 +522,8 @@ class ArtifactPage:
 
 
 class WorkspaceRepository(Protocol):
+    """Replaceable owner of versioned Workspace state."""
+
     async def create_workspace(
         self, workspace: WorkspaceState, context: RuntimeCallContext
     ) -> WorkspaceState: ...
@@ -524,6 +544,8 @@ class WorkspaceRepository(Protocol):
 
 
 class ArtifactRepository(Protocol):
+    """Replaceable owner of immutable Artifact bytes and metadata."""
+
     async def put_artifact(
         self, value: ArtifactValue, context: RuntimeCallContext
     ) -> ArtifactRecord: ...
@@ -542,12 +564,16 @@ class ArtifactRepository(Protocol):
 
 
 class StorageProvider(WorkspaceRepository, ArtifactRepository, Protocol):
+    """Provider-neutral composition of Workspace and Artifact repositories."""
+
     async def capabilities(
         self, context: RuntimeCallContext
     ) -> StorageCapabilities: ...
 
 
 class StorageProviderRegistry:
+    """Dependency-injected Provider lookup; it performs no backend discovery."""
+
     def __init__(self) -> None:
         self._providers: dict[ProviderId, StorageProvider] = {}
 
@@ -597,6 +623,8 @@ class InMemoryStorageProvider:
                 "new Workspace state version must be zero",
             )
         with self._lock:
+            # The same lock protects the existence check and insert, so create
+            # cannot accidentally behave like an upsert under concurrent calls.
             if workspace.workspace_id in self._workspaces:
                 raise core_error(
                     ErrorCategory.CONFLICT,
@@ -637,6 +665,8 @@ class InMemoryStorageProvider:
     ) -> WorkspaceState:
         _require_workspace_context(workspace.workspace_id, workspace.scope, context)
         with self._lock:
+            # CAS is one critical section: checking the stored version and
+            # replacing it cannot be interleaved by another local writer.
             current = self._workspaces.get(workspace.workspace_id)
             if current is None:
                 raise core_error(
@@ -689,6 +719,9 @@ class InMemoryStorageProvider:
                 ) from error
             existing = self._artifacts.get(record.artifact_id)
             if existing is not None:
+                # At-least-once replay is safe only for the exact same immutable
+                # value. Reusing an ArtifactId for any changed record or bytes is
+                # a conflict instead of an implicit update.
                 if existing == value:
                     return existing.record
                 raise core_error(
@@ -758,6 +791,9 @@ class InMemoryStorageProvider:
         records.sort(
             key=lambda item: (item.created_at, item.artifact_id.value), reverse=True
         )
+        # The extra record is not returned; it only proves that a continuation
+        # cursor is required. The two-field order is total even when timestamps
+        # collide, so in-memory and SQLite pagination agree.
         selected = tuple(records[: query.limit])
         next_cursor = None
         if len(records) > query.limit:
@@ -792,6 +828,8 @@ class InMemoryStorageProvider:
 
 
 class StorageGateway:
+    """The only public Storage dispatch path: authorize, invoke, verify, observe."""
+
     def __init__(
         self,
         *,
@@ -973,6 +1011,9 @@ class StorageGateway:
         self, query: ArtifactQuery, context: RuntimeCallContext
     ) -> ArtifactPage:
         _require_workspace_context(query.workspace_id, query.scope, context)
+        # List is the sole operation whose grant may change an input: policy can
+        # reduce limit. Every identity field remains fixed, and a continuation
+        # cursor forbids even that reduction because it already binds the limit.
         requested: dict[str, JsonValue] = {
             "workspace_id": query.workspace_id.value,
             "limit": query.limit,
@@ -1045,6 +1086,8 @@ class StorageGateway:
         try:
 
             async def operation(call: AuthorizedCall) -> object:
+                # Exact constraints make identity-bearing operations immune to a
+                # policy implementation that accidentally rewrites its grant.
                 _require_exact_constraints(call.grant.constraints, constraints)
                 return await self._invoke(invoke(provider, call), call.context)
 
@@ -1168,6 +1211,8 @@ class StorageGateway:
         context: RuntimeCallContext,
         payload: Mapping[str, JsonValue],
     ) -> None:
+        # These are observability events, not security-audit acknowledgements.
+        # Storage correctness must not depend on an optional telemetry sink.
         with suppress(Exception):
             await self._events.provider_event(event_type, context, payload)
 
@@ -1198,6 +1243,8 @@ def _require_exact_constraints(
 def _constrain_query(
     query: ArtifactQuery, constraints: Mapping[str, JsonValue]
 ) -> ArtifactQuery:
+    # Keep the exceptional narrowing rule small and explicit. Adding another
+    # mutable list constraint requires a contract/version change and tests here.
     if set(constraints) != {"workspace_id", "limit"}:
         _invalid_grant("Artifact list grant has unknown or missing constraints")
     if constraints["workspace_id"] != query.workspace_id.value:
@@ -1214,6 +1261,8 @@ def _constrain_query(
 
 
 def _validate_page(page: ArtifactPage, query: ArtifactQuery) -> None:
+    # A Provider is outside Core's trust boundary. Validate identity, Scope,
+    # cardinality, ordering, and continuation before returning its page.
     if len(page.items) > query.limit:
         _protocol_failure("storage provider returned too many Artifacts")
     previous: tuple[datetime, str] | None = None

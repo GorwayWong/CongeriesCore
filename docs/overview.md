@@ -221,6 +221,22 @@ update, deletion, and garbage collection remain deliberately absent until a
 future retention and migration contract can protect durable references. See
 [RFC-0015](rfcs/RFC-0015-storage-artifact-contracts.md).
 
+Here is one complete example. A caller creates Workspace version 0, writes
+Artifact `A`, then uses Workspace compare-and-set to publish `A` in the
+Workspace's reference list. If the process crashes and retries the Artifact
+write, the same ID and bytes are accepted as the same operation. If another
+writer already advanced the Workspace version, the stale compare-and-set fails
+without losing that writer's change. The Artifact remains available, but it is
+not silently attached to Workspace state; the caller must retry the explicit
+state transition.
+
+For review, start at StorageGateway rather than SQLite. The gateway explains
+which identities policy may not rewrite and which results Core verifies. Then
+review the in-memory implementation as the simplest semantic reference, the
+SQLite transactions as the durable equivalent, and finally the shared tests.
+The [Storage v1 Code Review Guide](reviews/task-6.2-storage-code-review.md)
+provides that route with operation traces and reviewer checklists.
+
 ## Implemented Minimal Workflow Runtime
 
 The delivered direct Workflow Runtime is deliberately smaller than a complete

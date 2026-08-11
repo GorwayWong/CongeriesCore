@@ -690,6 +690,8 @@ Delivered:
 - Authorized dispatch for every Storage action with exact immutable constraints,
   list-limit narrowing, deadline, cancellation, late-result discard, protocol
   validation, and redacted operation events
+- A plain-language implementation summary and a file-by-file
+  [Storage v1 Code Review Guide](docs/reviews/task-6.2-storage-code-review.md)
 
 Implement replaceable Workspace, Artifact, Session, Run, and Checkpoint storage
 contracts and adapters without selecting a mandatory database.
@@ -745,15 +747,50 @@ authorization, persistence, or recovery path.
 
 Recommended order:
 
-1. Freeze ContextNode configuration, binding, output-reference, failure,
-   checkpoint, recovery, and compatibility behavior as an RFC-0003 increment.
-2. Dispatch ContextNode through the existing authorized ContextResolver and
-   persist any downstream-required result through the Workflow output boundary
-   before committing the stable node Checkpoint.
-3. Cover default denial, partial and failed resolution, deadline, cancellation,
-   late results, output persistence, recovery skip, and downstream gating.
-4. Add exact Workflow fixtures, then proceed to SkillNode and ToolNode in
-   increasing side-effect risk.
+1. Add an RFC-0003 increment before runtime code. Resolve the exact version 1
+   `ContextNodeConfig`, whether the existing ContextBinding is embedded or
+   referenced, and the strict JSON shape used to persist a ResolvedContext. Do
+   not leave node-specific meaning inside an untyped config dictionary.
+2. Extend Workflow model decoding and validation. Reject unsupported versions,
+   malformed bindings, mismatched input/output schemas, missing Context actions,
+   or permissions whose Provider resources do not match the configured binding
+   before creating a child call or Checkpoint.
+3. Add one injected ContextResolver dependency to WorkflowRuntime. Derive the
+   node RuntimeCallContext from the parent Run, node Scope, deadline, cancellation,
+   trace, and stable idempotency identity; do not call ContextProviderRegistry or
+   a StorageProvider directly from the node executor.
+4. Convert the successful ResolvedContext into the frozen node result shape and
+   persist it through NodeOutputPersistence before marking the node successful.
+   Commit the stable Checkpoint only after that durable reference exists.
+5. Preserve failure semantics. Required-complete bindings reject partial results;
+   denial, timeout, cancellation, Provider failure, malformed output, and output
+   persistence failure unlock no downstream node. A recovered stable node loads
+   its reference and skips Provider execution.
+6. Add exact config/result fixtures and focused unit plus Workflow integration
+   tests. Cover pre-dispatch validation, permission/resource matching, successful
+   complete and allowed-partial resolution, default denial, deadline,
+   cancellation, late-result discard, persistence ordering, checkpoint failure,
+   and recovery skip before changing RFC-0003 coverage notes.
+
+Why ContextNode first: it is a read-oriented composition of an already
+implemented authorized resolver, so it exercises Workflow value persistence and
+recovery with less side-effect risk than SkillNode or ToolNode. It should add no
+new Provider, authorization, storage, scheduler, or engine abstraction.
+
+Milestone acceptance:
+
+- ContextNode is rejected during validation until its full versioned contract,
+  schemas, binding, permissions, and Provider resources are valid.
+- Runtime dispatch goes only through ContextResolver and the existing
+  AuthorizedDispatcher path.
+- A successful output is durably referenced before the stable node Checkpoint;
+  non-success never unlocks dependents.
+- Deadline and cancellation clean up active Provider work, and late results cause
+  no Workflow persistence or state transition.
+- Recovery skips a stable ContextNode and replays only interrupted work with the
+  same identity.
+- Exact fixtures, pytest coverage at or above 90%, Ruff, Pyright, and whitespace
+  gates remain green.
 
 Agent Tool loops, automatic Skill injection, parallel scheduling, and external
 Workflow engines remain separately reviewed future work.

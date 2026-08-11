@@ -21,6 +21,8 @@ from congeries_core.runtime.scope import ScopeRef
 
 @dataclass(frozen=True, slots=True)
 class WorkspaceState:
+    """Versioned durable state; callers publish references through explicit CAS."""
+
     CONTRACT_VERSION: ClassVar[str] = "1"
 
     workspace_id: WorkspaceId
@@ -41,6 +43,9 @@ class WorkspaceState:
         *,
         artifact_refs: tuple[ArtifactId, ...] | None = None,
     ) -> WorkspaceState:
+        # Building the next value is itself version-aware. The repository repeats
+        # this check atomically against stored state because another writer may
+        # commit between local construction and persistence.
         if self.state_version != expected_version:
             raise core_error(
                 ErrorCategory.CONFLICT,
@@ -71,6 +76,8 @@ class WorkspaceState:
 
     @classmethod
     def from_data(cls, data: dict[str, object]) -> WorkspaceState:
+        # Exact keys make fixture drift visible instead of silently accepting a
+        # field that an older implementation would ignore.
         expected = {
             "contract_version",
             "workspace_id",
