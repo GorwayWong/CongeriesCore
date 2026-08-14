@@ -1,0 +1,96 @@
+{
+  "contract_version": "1",
+  "workflow_id": "workflow-skill-1",
+  "definition_id": "workflow-skill-definition-1",
+  "version": "1",
+  "input_schema": {
+    "namespace": "test",
+    "name": "workflow_value",
+    "version": "1"
+  },
+  "nodes": [
+    {
+      "node_id": "skill",
+      "node_type": "skill",
+      "contract_version": "1",
+      "input_schema": null,
+      "input_bindings": [],
+      "output_schema": {
+        "namespace": "core",
+        "name": "skill_node_result",
+        "version": "1"
+      },
+      "scope": {
+        "namespace": "core",
+        "kind": "run",
+        "id": "node-skill",
+        "parent": {
+          "namespace": "core",
+          "kind": "workspace",
+          "id": "workspace-1",
+          "parent": null
+        }
+      },
+      "permissions": [
+        {
+          "action": {
+            "namespace": "core",
+            "name": "workflow.node.execute",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "workflow_node",
+            "id": "skill",
+            "owning_extension": null
+          }
+        },
+        {
+          "action": {
+            "namespace": "core",
+            "name": "skill.resource.read",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "skill_resource",
+            "id": "test.capabilities.skill:guide",
+            "owning_extension": "test.capabilities"
+          }
+        }
+      ],
+      "timeout_seconds": 30,
+      "retry_limit": 0,
+      "side_effecting": false,
+      "idempotency_required": true,
+      "checkpoint": true,
+      "config": {
+        "skill": {
+          "namespace": "core",
+          "kind": "skill",
+          "id": "test.capabilities.skill",
+          "owning_extension": "test.capabilities",
+          "contract_version": "1"
+        },
+        "resource_id": "guide",
+        "max_bytes": 64
+      }
+    }
+  ],
+  "dependencies": [],
+  "output_schema": {
+    "namespace": "core",
+    "name": "skill_node_result",
+    "version": "1"
+  },
+  "output_binding": {
+    "source_node_id": "skill",
+    "required": true
+  },
+  "execution_policy": {
+    "max_concurrency": 1,
+    "failure_mode": "fail_fast",
+    "compensation_enabled": false,
+    "max_attempts": 1
+  }
+}

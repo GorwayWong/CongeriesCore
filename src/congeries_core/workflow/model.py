@@ -14,6 +14,16 @@ from congeries_core.checkpoint import (
     CheckpointReference,
 )
 from congeries_core.policy.authorization import ActionRef, ResourceRef
+from congeries_core.provider.context import (
+    ContextBinding,
+    ContextCompleteness,
+    ContextEntry,
+    ContextKey,
+    ContextUsage,
+    ContextWarning,
+    ResolvedContext,
+)
+from congeries_core.runtime.capability import CapabilityRef
 from congeries_core.runtime.context import RuntimeCallContext
 from congeries_core.runtime.control import require_utc
 from congeries_core.runtime.errors import ErrorDetail
@@ -24,6 +34,7 @@ from congeries_core.runtime.ids import (
     ModelBindingRef,
     NodeId,
     ProviderId,
+    ResourceId,
     RunId,
     WorkflowId,
 )
@@ -37,6 +48,9 @@ from congeries_core.runtime.json_types import (
 from congeries_core.runtime.run import Run, RunStatus, WorkflowRun
 from congeries_core.runtime.schema import SchemaRef
 from congeries_core.runtime.scope import ScopeRef
+from congeries_core.skill import SkillResource
+from congeries_core.tool import ToolCall, ToolDescriptor, ToolResult
+from congeries_core.tool.operation import ToolOperationStatus
 
 
 class WorkflowNodeType(StrEnum):
@@ -46,6 +60,15 @@ class WorkflowNodeType(StrEnum):
     CONTEXT = "context"
     APPROVAL = "approval"
     EVALUATION = "evaluation"
+
+
+CONTEXT_NODE_RESULT_SCHEMA = SchemaRef("core", "context_node_result", "1")
+_CONTEXT_NODE_RESULT_CONTRACT_VERSION = "1"
+SKILL_NODE_RESULT_SCHEMA = SchemaRef("core", "skill_node_result", "1")
+_SKILL_NODE_RESULT_CONTRACT_VERSION = "1"
+TOOL_NODE_REQUEST_SCHEMA = SchemaRef("core", "tool_node_request", "1")
+TOOL_NODE_RESULT_SCHEMA = SchemaRef("core", "tool_node_result", "1")
+_TOOL_NODE_CONTRACT_VERSION = "1"
 
 
 class WorkflowInputSource(StrEnum):
@@ -240,6 +263,461 @@ class AgentNodeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ContextNodeConfig:
+    """Version 1 ContextNode configuration.
+
+    The binding is embedded deliberately. A Workflow definition is therefore a
+    complete, reviewable description of which Providers and Schemas the node may
+    use; execution never depends on a hidden binding lookup or mutable registry.
+    """
+
+    binding: ContextBinding
+
+    def to_data(self) -> dict[str, object]:
+        return {"binding": self.binding.to_data()}
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ContextNodeConfig:
+        _require_keys(data, {"binding"}, "ContextNode config")
+        raw_binding = _strict_context_binding_data(data["binding"])
+        return cls(binding=ContextBinding.from_data(raw_binding))
+
+
+@dataclass(frozen=True, slots=True)
+class SkillNodeConfig:
+    """Version 1 configuration for one declared, read-only Skill resource."""
+
+    skill: CapabilityRef
+    resource_id: ResourceId
+    max_bytes: int
+
+    def __post_init__(self) -> None:
+        if self.skill.namespace != "core" or self.skill.kind != "skill":
+            raise ValueError("SkillNode requires a core Skill reference")
+        if self.skill.contract_version != "1":
+            raise ValueError("SkillNode requires a Skill v1 reference")
+        if isinstance(self.max_bytes, bool) or self.max_bytes < 1:
+            raise ValueError("SkillNode max_bytes must be positive")
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "skill": self.skill.to_data(),
+            "resource_id": self.resource_id.value,
+            "max_bytes": self.max_bytes,
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> SkillNodeConfig:
+        _require_keys(data, {"skill", "resource_id", "max_bytes"}, "SkillNode config")
+        return cls(
+            skill=CapabilityRef.from_data(as_object(data["skill"], "SkillNode skill")),
+            resource_id=ResourceId(
+                _as_string(data["resource_id"], "SkillNode resource")
+            ),
+            max_bytes=as_int(data["max_bytes"], "SkillNode max_bytes"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SkillNodeResult:
+    contract_version: str
+    resource: SkillResource
+
+    def __post_init__(self) -> None:
+        if self.contract_version != _SKILL_NODE_RESULT_CONTRACT_VERSION:
+            raise ValueError("SkillNode result contract version is unsupported")
+
+    @classmethod
+    def from_resource(cls, resource: SkillResource) -> SkillNodeResult:
+        return cls(_SKILL_NODE_RESULT_CONTRACT_VERSION, resource)
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "resource": self.resource.to_data(),
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> SkillNodeResult:
+        _require_keys(data, {"contract_version", "resource"}, "SkillNode result")
+        return cls(
+            _as_string(data["contract_version"], "SkillNode result contract version"),
+            SkillResource.from_data(as_object(data["resource"], "SkillNode resource")),
+        )
+
+
+class SkillNodeResultSchemaValidator:
+    def validate(self, value: JsonValue) -> None:
+        SkillNodeResult.from_data(as_object(value, "SkillNode result"))
+
+
+@dataclass(frozen=True, slots=True)
+class ToolNodeConfig:
+    tool: CapabilityRef
+
+    def __post_init__(self) -> None:
+        if self.tool.namespace != "core" or self.tool.kind != "tool":
+            raise ValueError("ToolNode requires a core Tool reference")
+        if self.tool.contract_version != "1":
+            raise ValueError("ToolNode requires a Tool v1 reference")
+
+    def to_data(self) -> dict[str, object]:
+        return {"tool": self.tool.to_data()}
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ToolNodeConfig:
+        _require_keys(data, {"tool"}, "ToolNode config")
+        return cls(CapabilityRef.from_data(as_object(data["tool"], "ToolNode tool")))
+
+
+@dataclass(frozen=True, slots=True)
+class ToolNodeRequest:
+    call: ToolCall
+    descriptor: ToolDescriptor
+    scope: ScopeRef
+    timeout_seconds: int | None
+    contract_version: str = _TOOL_NODE_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != _TOOL_NODE_CONTRACT_VERSION:
+            raise ValueError("ToolNode request contract version is unsupported")
+        if self.call.tool != self.descriptor.ref:
+            raise ValueError("ToolNode request descriptor does not match call")
+        if self.timeout_seconds is not None and self.timeout_seconds < 1:
+            raise ValueError("ToolNode request timeout must be positive")
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "call": self.call.to_data(),
+            "descriptor": self.descriptor.to_data(),
+            "scope": self.scope.to_data(),
+            "timeout_seconds": self.timeout_seconds,
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ToolNodeRequest:
+        _require_keys(
+            data,
+            {"contract_version", "call", "descriptor", "scope", "timeout_seconds"},
+            "ToolNode request",
+        )
+        timeout = data["timeout_seconds"]
+        return cls(
+            call=ToolCall.from_data(as_object(data["call"], "ToolNode call")),
+            descriptor=ToolDescriptor.from_data(
+                as_object(data["descriptor"], "ToolNode descriptor")
+            ),
+            scope=ScopeRef.from_data(as_object(data["scope"], "ToolNode scope")),
+            timeout_seconds=(
+                as_int(timeout, "ToolNode timeout") if timeout is not None else None
+            ),
+            contract_version=_as_string(
+                data["contract_version"], "ToolNode request contract version"
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolNodeResult:
+    operation_id: ResourceId
+    tool: CapabilityRef
+    request_fingerprint: str
+    status: ToolOperationStatus
+    result: ToolResult | None = None
+    error: ErrorDetail | None = None
+    evidence_ref: CheckpointReference | None = None
+    contract_version: str = _TOOL_NODE_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != _TOOL_NODE_CONTRACT_VERSION:
+            raise ValueError("ToolNode result contract version is unsupported")
+        if len(self.request_fingerprint) != 64 or any(
+            item not in "0123456789abcdef" for item in self.request_fingerprint
+        ):
+            raise ValueError("ToolNode result request fingerprint is invalid")
+        if self.status not in {
+            ToolOperationStatus.SUCCEEDED,
+            ToolOperationStatus.FAILED,
+            ToolOperationStatus.UNKNOWN,
+        }:
+            raise ValueError("ToolNode result status is not durable")
+        if self.status is ToolOperationStatus.SUCCEEDED:
+            if self.result is None or self.error is not None:
+                raise ValueError("successful ToolNode result requires only ToolResult")
+            if self.result.tool != self.tool:
+                raise ValueError("ToolNode result Tool identity does not match")
+        elif self.result is not None or self.error is None:
+            raise ValueError("non-success ToolNode result requires only an error")
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "operation_id": self.operation_id.value,
+            "tool": self.tool.to_data(),
+            "request_fingerprint": self.request_fingerprint,
+            "status": self.status.value,
+            "result": self.result.to_data() if self.result else None,
+            "error": self.error.to_data() if self.error else None,
+            "evidence_ref": self.evidence_ref.to_data() if self.evidence_ref else None,
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ToolNodeResult:
+        _require_keys(
+            data,
+            {
+                "contract_version",
+                "operation_id",
+                "tool",
+                "request_fingerprint",
+                "status",
+                "result",
+                "error",
+                "evidence_ref",
+            },
+            "ToolNode result",
+        )
+        raw_result, raw_error, raw_evidence = (
+            data["result"],
+            data["error"],
+            data["evidence_ref"],
+        )
+        return cls(
+            operation_id=ResourceId(_as_string(data["operation_id"], "operation id")),
+            tool=CapabilityRef.from_data(as_object(data["tool"], "ToolNode tool")),
+            request_fingerprint=_as_string(data["request_fingerprint"], "fingerprint"),
+            status=ToolOperationStatus(_as_string(data["status"], "ToolNode status")),
+            result=ToolResult.from_data(as_object(raw_result, "ToolNode ToolResult"))
+            if raw_result is not None
+            else None,
+            error=ErrorDetail.from_data(as_object(raw_error, "ToolNode error"))
+            if raw_error is not None
+            else None,
+            evidence_ref=CheckpointReference.from_data(
+                as_object(raw_evidence, "ToolNode evidence")
+            )
+            if raw_evidence is not None
+            else None,
+            contract_version=_as_string(
+                data["contract_version"], "ToolNode result contract version"
+            ),
+        )
+
+
+class ToolNodeRequestSchemaValidator:
+    def validate(self, value: JsonValue) -> None:
+        ToolNodeRequest.from_data(as_object(value, "ToolNode request"))
+
+
+class ToolNodeResultSchemaValidator:
+    def validate(self, value: JsonValue) -> None:
+        ToolNodeResult.from_data(as_object(value, "ToolNode result"))
+
+
+@dataclass(frozen=True, slots=True)
+class ToolOperationResolution:
+    operation_id: ResourceId
+    expected_version: int
+    status: ToolOperationStatus
+    evidence_ref: CheckpointReference
+    output: JsonValue = None
+    error: ErrorDetail | None = None
+    attempts: int = 1
+    contract_version: str = _TOOL_NODE_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != _TOOL_NODE_CONTRACT_VERSION:
+            raise ValueError("Tool resolution contract version is unsupported")
+        if self.expected_version < 0 or self.attempts < 1:
+            raise ValueError("Tool resolution version and attempts must be valid")
+        if self.status not in {
+            ToolOperationStatus.SUCCEEDED,
+            ToolOperationStatus.FAILED,
+        }:
+            raise ValueError("Tool resolution outcome must be succeeded or failed")
+        object.__setattr__(
+            self, "output", as_json_value(self.output, "Tool resolution output")
+        )
+        if self.status is ToolOperationStatus.SUCCEEDED and self.error is not None:
+            raise ValueError("successful Tool resolution cannot contain an error")
+        if self.status is ToolOperationStatus.FAILED and (
+            self.error is None or self.output is not None
+        ):
+            raise ValueError("failed Tool resolution requires only an error")
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "operation_id": self.operation_id.value,
+            "expected_version": self.expected_version,
+            "status": self.status.value,
+            "evidence_ref": self.evidence_ref.to_data(),
+            "output": self.output,
+            "error": self.error.to_data() if self.error else None,
+            "attempts": self.attempts,
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ToolOperationResolution:
+        _require_keys(
+            data,
+            {
+                "contract_version",
+                "operation_id",
+                "expected_version",
+                "status",
+                "evidence_ref",
+                "output",
+                "error",
+                "attempts",
+            },
+            "Tool operation resolution",
+        )
+        raw_error = data["error"]
+        return cls(
+            ResourceId(_as_string(data["operation_id"], "operation id")),
+            as_int(data["expected_version"], "expected version"),
+            ToolOperationStatus(_as_string(data["status"], "resolution status")),
+            CheckpointReference.from_data(
+                as_object(data["evidence_ref"], "resolution evidence")
+            ),
+            as_json_value(data["output"], "resolution output"),
+            ErrorDetail.from_data(as_object(raw_error, "resolution error"))
+            if raw_error is not None
+            else None,
+            as_int(data["attempts"], "resolution attempts"),
+            _as_string(data["contract_version"], "resolution contract version"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ContextNodeResult:
+    """Stable JSON value persisted for a successful ContextNode.
+
+    ResolvedContext is an in-process resolver result. This separate contract is
+    the durable Workflow boundary: it has its own version, exact wire shape, and
+    invariants so recovery does not depend on the resolver's internal objects.
+    """
+
+    contract_version: str
+    entries: tuple[ContextEntry, ...]
+    completeness: ContextCompleteness
+    missing_keys: tuple[ContextKey, ...]
+    warnings: tuple[ContextWarning, ...]
+    selected_providers: tuple[ProviderId, ...]
+    usage: ContextUsage
+
+    def __post_init__(self) -> None:
+        # These are persistence invariants, not merely Provider validation. A
+        # recovered reader must never have to guess whether a duplicated key,
+        # duplicated Provider, or present-and-missing key is authoritative.
+        if self.contract_version != _CONTEXT_NODE_RESULT_CONTRACT_VERSION:
+            raise ValueError("ContextNode result contract version is unsupported")
+        if not self.selected_providers:
+            raise ValueError("ContextNode result requires at least one provider")
+        if len(set(self.selected_providers)) != len(self.selected_providers):
+            raise ValueError("ContextNode result providers must be unique")
+        entry_keys = tuple(entry.key for entry in self.entries)
+        if len(set(entry_keys)) != len(entry_keys):
+            raise ValueError("ContextNode result entry keys must be unique")
+        if len(set(self.missing_keys)) != len(self.missing_keys):
+            raise ValueError("ContextNode result missing keys must be unique")
+        if set(entry_keys) & set(self.missing_keys):
+            raise ValueError("ContextNode result keys cannot be present and missing")
+        if self.completeness is ContextCompleteness.COMPLETE and self.missing_keys:
+            raise ValueError("complete ContextNode result cannot report missing keys")
+        if self.completeness is ContextCompleteness.PARTIAL and not self.missing_keys:
+            raise ValueError("partial ContextNode result must report missing keys")
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "contract_version": self.contract_version,
+            "entries": [entry.to_data() for entry in self.entries],
+            "completeness": self.completeness.value,
+            "missing_keys": [key.to_data() for key in self.missing_keys],
+            "warnings": [warning.to_data() for warning in self.warnings],
+            "selected_providers": [item.value for item in self.selected_providers],
+            "usage": self.usage.to_data(),
+        }
+
+    @classmethod
+    def from_resolved(cls, resolved: ResolvedContext) -> ContextNodeResult:
+        # Keep this conversion intentionally lossless. Provider selection, usage,
+        # warnings, and missing keys are recovery/debugging evidence, not optional
+        # observability metadata that may be dropped before persistence.
+        return cls(
+            contract_version=_CONTEXT_NODE_RESULT_CONTRACT_VERSION,
+            entries=resolved.entries,
+            completeness=resolved.completeness,
+            missing_keys=resolved.missing_keys,
+            warnings=resolved.warnings,
+            selected_providers=resolved.selected_providers,
+            usage=resolved.usage,
+        )
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ContextNodeResult:
+        _require_keys(
+            data,
+            {
+                "contract_version",
+                "entries",
+                "completeness",
+                "missing_keys",
+                "warnings",
+                "selected_providers",
+                "usage",
+            },
+            "ContextNode result",
+        )
+        entries = tuple(
+            ContextEntry.from_data(_strict_context_entry_data(item))
+            for item in as_array(data["entries"], "ContextNode result entries")
+        )
+        missing_keys = tuple(
+            ContextKey.from_data(
+                _strict_context_key_data(item, "ContextNode result missing key")
+            )
+            for item in as_array(
+                data["missing_keys"], "ContextNode result missing keys"
+            )
+        )
+        warnings = tuple(
+            ContextWarning.from_data(_strict_context_warning_data(item))
+            for item in as_array(data["warnings"], "ContextNode result warnings")
+        )
+        usage = _strict_context_object(
+            data["usage"], {"byte_count", "token_count"}, "ContextNode result usage"
+        )
+        return cls(
+            contract_version=_as_string(
+                data["contract_version"], "ContextNode result contract version"
+            ),
+            entries=entries,
+            completeness=ContextCompleteness(
+                _as_string(data["completeness"], "ContextNode result completeness")
+            ),
+            missing_keys=missing_keys,
+            warnings=warnings,
+            selected_providers=tuple(
+                ProviderId(_as_string(item, "ContextNode result provider"))
+                for item in as_array(
+                    data["selected_providers"], "ContextNode result providers"
+                )
+            ),
+            usage=ContextUsage.from_data(usage),
+        )
+
+
+class ContextNodeResultSchemaValidator:
+    """SchemaRegistry adapter for the fixed ContextNode durable result shape."""
+
+    def validate(self, value: JsonValue) -> None:
+        ContextNodeResult.from_data(as_object(value, "ContextNode result"))
+
+
+@dataclass(frozen=True, slots=True)
 class ApprovalNodeConfig:
     prompt_ref: CheckpointReference
     allowed_outcomes: tuple[ApprovalOutcome, ...] = (
@@ -346,7 +824,13 @@ class UnsupportedNodeConfig:
 
 
 type WorkflowNodeConfig = (
-    AgentNodeConfig | ApprovalNodeConfig | EvaluationNodeConfig | UnsupportedNodeConfig
+    AgentNodeConfig
+    | ApprovalNodeConfig
+    | ContextNodeConfig
+    | EvaluationNodeConfig
+    | SkillNodeConfig
+    | ToolNodeConfig
+    | UnsupportedNodeConfig
 )
 
 
@@ -425,6 +909,12 @@ class WorkflowNode:
         raw_config = as_object(data["config"], "node config")
         if node_type == WorkflowNodeType.AGENT.value:
             config: WorkflowNodeConfig = AgentNodeConfig.from_data(raw_config)
+        elif node_type == WorkflowNodeType.CONTEXT.value:
+            config = ContextNodeConfig.from_data(raw_config)
+        elif node_type == WorkflowNodeType.SKILL.value:
+            config = SkillNodeConfig.from_data(raw_config)
+        elif node_type == WorkflowNodeType.TOOL.value:
+            config = ToolNodeConfig.from_data(raw_config)
         elif node_type == WorkflowNodeType.APPROVAL.value:
             config = ApprovalNodeConfig.from_data(raw_config)
         elif node_type == WorkflowNodeType.EVALUATION.value:
@@ -756,9 +1246,48 @@ class WorkflowSuspension:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolOperationSuspension:
+    run: WorkflowRun
+    checkpoint_ref: CheckpointRef
+    operation_id: ResourceId
+    record_version: int
+
+    def __post_init__(self) -> None:
+        if self.run.status is not RunStatus.PAUSED:
+            raise ValueError("Tool operation suspension requires PAUSED")
+        if self.record_version < 0:
+            raise ValueError("Tool operation suspension version is invalid")
+
+    def to_data(self) -> dict[str, object]:
+        return {
+            "run": self.run.to_data(),
+            "checkpoint_ref": self.checkpoint_ref.value,
+            "operation_id": self.operation_id.value,
+            "record_version": self.record_version,
+        }
+
+    @classmethod
+    def from_data(cls, data: dict[str, object]) -> ToolOperationSuspension:
+        _require_keys(
+            data,
+            {"run", "checkpoint_ref", "operation_id", "record_version"},
+            "Tool operation suspension",
+        )
+        run = Run.from_data(as_object(data["run"], "Tool suspension run"))
+        if not isinstance(run, WorkflowRun):
+            raise ValueError("Tool operation suspension requires WorkflowRun")
+        return cls(
+            run,
+            CheckpointRef(_as_string(data["checkpoint_ref"], "checkpoint ref")),
+            ResourceId(_as_string(data["operation_id"], "operation id")),
+            as_int(data["record_version"], "record version"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class WorkflowExecutionOutcome:
     result: WorkflowResult | None = None
-    suspension: WorkflowSuspension | None = None
+    suspension: WorkflowSuspension | ToolOperationSuspension | None = None
 
     def __post_init__(self) -> None:
         if (self.result is None) == (self.suspension is None):
@@ -784,11 +1313,10 @@ class WorkflowExecutionOutcome:
                 )
             )
         if kind == "suspended" and raw_result is None and raw_suspension is not None:
-            return cls(
-                suspension=WorkflowSuspension.from_data(
-                    as_object(raw_suspension, "Workflow outcome suspension")
-                )
-            )
+            suspension = as_object(raw_suspension, "Workflow outcome suspension")
+            if "approval" in suspension:
+                return cls(suspension=WorkflowSuspension.from_data(suspension))
+            return cls(suspension=ToolOperationSuspension.from_data(suspension))
         raise ValueError("Workflow outcome discriminator does not match its payload")
 
 
@@ -797,6 +1325,92 @@ def _require_keys(
 ) -> None:
     if set(data) != set(expected):
         raise ValueError(f"{field_name} contains unknown or missing fields")
+
+
+def _strict_context_object(
+    value: object, expected: Collection[str], field_name: str
+) -> dict[str, object]:
+    data = as_object(value, field_name)
+    _require_keys(data, expected, field_name)
+    return data
+
+
+# ContextProvider v1 decoders predate ContextNode's byte-exact persistence
+# contract and intentionally accept some optional fields. These wrappers close
+# that gap at the Workflow boundary: nested objects are checked just as strictly
+# as the top-level ContextNodeConfig and ContextNodeResult objects.
+
+
+def _strict_context_key_data(value: object, field_name: str) -> dict[str, object]:
+    data = _strict_context_object(value, {"namespace", "name"}, field_name)
+    _as_string(data["namespace"], f"{field_name} namespace")
+    _as_string(data["name"], f"{field_name} name")
+    return data
+
+
+def _strict_schema_data(value: object, field_name: str) -> dict[str, object]:
+    data = _strict_context_object(value, {"namespace", "name", "version"}, field_name)
+    _as_string(data["namespace"], f"{field_name} namespace")
+    _as_string(data["name"], f"{field_name} name")
+    _as_string(data["version"], f"{field_name} version")
+    return data
+
+
+def _strict_context_binding_data(value: object) -> dict[str, object]:
+    data = _strict_context_object(
+        value,
+        {
+            "provider_ids",
+            "requirements",
+            "merge_strategy",
+            "completeness_policy",
+            "budget",
+        },
+        "ContextNode binding",
+    )
+    for provider_id in as_array(data["provider_ids"], "ContextNode providers"):
+        _as_string(provider_id, "ContextNode provider id")
+    for value in as_array(data["requirements"], "ContextNode requirements"):
+        requirement = _strict_context_object(
+            value, {"key", "schema"}, "ContextNode requirement"
+        )
+        _strict_context_key_data(requirement["key"], "ContextNode requirement key")
+        _strict_schema_data(requirement["schema"], "ContextNode requirement schema")
+    _as_string(data["merge_strategy"], "ContextNode merge strategy")
+    _as_string(data["completeness_policy"], "ContextNode completeness policy")
+    _strict_context_object(
+        data["budget"], {"max_bytes", "max_tokens"}, "ContextNode budget"
+    )
+    return data
+
+
+def _strict_context_entry_data(value: object) -> dict[str, object]:
+    data = _strict_context_object(
+        value,
+        {"key", "schema", "value", "provenance", "fresh_at", "expires_at"},
+        "ContextNode result entry",
+    )
+    _strict_context_key_data(data["key"], "ContextNode result entry key")
+    _strict_schema_data(data["schema"], "ContextNode result entry schema")
+    for provenance in as_array(
+        data["provenance"], "ContextNode result entry provenance"
+    ):
+        _as_string(provenance, "ContextNode result entry provenance")
+    for field_name in ("fresh_at", "expires_at"):
+        if data[field_name] is not None:
+            _as_string(data[field_name], f"ContextNode result entry {field_name}")
+    return data
+
+
+def _strict_context_warning_data(value: object) -> dict[str, object]:
+    data = _strict_context_object(
+        value, {"code", "message", "key"}, "ContextNode result warning"
+    )
+    _as_string(data["code"], "ContextNode result warning code")
+    _as_string(data["message"], "ContextNode result warning message")
+    if data["key"] is not None:
+        _strict_context_key_data(data["key"], "ContextNode result warning key")
+    return data
 
 
 def _as_string(value: object, field_name: str) -> str:

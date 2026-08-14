@@ -1,0 +1,22 @@
+[
+  {
+    "name": "tool_operation.prepare",
+    "namespace": "core",
+    "version": "1"
+  },
+  {
+    "name": "tool_operation.read",
+    "namespace": "core",
+    "version": "1"
+  },
+  {
+    "name": "tool_operation.transition",
+    "namespace": "core",
+    "version": "1"
+  },
+  {
+    "name": "tool_operation.resolve",
+    "namespace": "core",
+    "version": "1"
+  }
+]

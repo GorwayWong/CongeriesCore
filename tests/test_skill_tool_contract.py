@@ -245,12 +245,31 @@ class ContractRuntime:
     executor: TestToolExecutor
 
 
+@dataclass(slots=True)
+class RecordingExecutionGuard:
+    calls: list[str] = field(default_factory=list[str])
+    failure: CoreError | None = None
+
+    async def before_execute(
+        self,
+        call: ToolCall,
+        descriptor: ToolDescriptor,
+        context: RuntimeCallContext,
+    ) -> None:
+        del call, descriptor
+        assert context.idempotency_key is not None
+        self.calls.append(context.idempotency_key.value)
+        if self.failure is not None:
+            raise self.failure
+
+
 async def runtime(
     loader_type: type[TestSkillLoader] = FakeSkillLoader,
     executor_type: type[TestToolExecutor] = FakeToolExecutor,
     *,
     policy: RecordingPolicy | None = None,
     tool_timeout_ms: int | None = 1_000,
+    side_effect: ToolSideEffect = ToolSideEffect.EXTERNAL,
 ) -> ContractRuntime:
     clock = FixedClock()
     registry = CapabilityRegistry()
@@ -331,8 +350,10 @@ async def runtime(
             OUTPUT_SCHEMA,
             TOOL_EXECUTE_ACTION,
             ToolExecutionPolicy(timeout_ms=tool_timeout_ms, max_attempts=2),
-            ToolSideEffect.EXTERNAL,
-            ToolIdempotencyMode.CALLER_KEY,
+            side_effect,
+            ToolIdempotencyMode.CALLER_KEY
+            if side_effect is not ToolSideEffect.NONE
+            else ToolIdempotencyMode.NOT_APPLICABLE,
         ),
         executor,
     )
@@ -478,6 +499,24 @@ async def test_skill_loader_contract_is_lazy_authorized_and_leased(
     assert await fixture.lifecycle.active_lease_count("test.capabilities") == 0
     payloads = [payload for _, payload in fixture.events.events]
     assert all("content" not in payload for payload in payloads)
+
+
+@pytest.mark.asyncio
+async def test_skill_read_allows_sequential_replay_but_tool_still_conflicts() -> None:
+    fixture = await runtime()
+    context = call_context()
+    request = SkillResourceRequest(SKILL_REF, ResourceId("guide"), 64)
+
+    first = await fixture.skill_gateway.load(request, context)
+    replay = await fixture.skill_gateway.load(request, context)
+
+    assert replay == first
+    assert fixture.loader.calls == ["guide", "guide"]
+    tool_call = ToolCall(TOOL_REF, {"value": "x"})
+    await fixture.tool_gateway.execute(tool_call, context)
+    with pytest.raises(CoreError) as duplicate_tool:
+        await fixture.tool_gateway.execute(tool_call, context)
+    assert duplicate_tool.value.detail.code == "lease_identity_conflict"
 
 
 @pytest.mark.asyncio
@@ -812,3 +851,46 @@ def test_shared_resolver_rejects_owner_and_version_mismatch() -> None:
         assert version.value.detail.category is ErrorCategory.VERSION_MISMATCH
 
     asyncio.run(exercise())
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_guard_runs_once_before_all_executor_attempts() -> None:
+    fixture = await runtime()
+    guard = RecordingExecutionGuard()
+    context = call_context()
+    result = await fixture.tool_gateway.execute(
+        ToolCall(TOOL_REF, {"value": "guarded"}), context, guard=guard
+    )
+    assert result.output == {"ok": "guarded"}
+    assert context.idempotency_key is not None
+    assert guard.calls == [context.idempotency_key.value]
+    assert len(fixture.executor.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_tool_execution_guard_failure_prevents_executor_entry() -> None:
+    fixture = await runtime()
+    guard = RecordingExecutionGuard(
+        failure=core_error(
+            ErrorCategory.UNAVAILABLE,
+            "operation_log_unavailable",
+            "operation guard failed",
+        )
+    )
+    with pytest.raises(CoreError) as error:
+        await fixture.tool_gateway.execute(
+            ToolCall(TOOL_REF, {"value": "blocked"}), call_context(), guard=guard
+        )
+    assert error.value.detail.code == "operation_log_unavailable"
+    assert fixture.executor.calls == []
+
+
+@pytest.mark.asyncio
+async def test_side_effect_free_tool_allows_sequential_logical_replay() -> None:
+    fixture = await runtime(side_effect=ToolSideEffect.NONE)
+    context = call_context()
+    call = ToolCall(TOOL_REF, {"value": "repeatable"})
+    first = await fixture.tool_gateway.execute(call, context)
+    second = await fixture.tool_gateway.execute(call, context)
+    assert first.output == second.output == {"ok": "repeatable"}
+    assert len(fixture.executor.calls) == 3

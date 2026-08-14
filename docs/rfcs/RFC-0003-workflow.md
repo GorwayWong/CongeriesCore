@@ -6,8 +6,8 @@
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-10
-- Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [RFC-0004](RFC-0004-execution-run-lifecycle.md), [RFC-0011](RFC-0011-checkpoint-recovery.md), [RFC-0012](RFC-0012-evaluation.md)
+- Updated: 2026-08-12
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [RFC-0004](RFC-0004-execution-run-lifecycle.md), [RFC-0006](RFC-0006-context-provider.md), [RFC-0011](RFC-0011-checkpoint-recovery.md), [RFC-0012](RFC-0012-evaluation.md), [RFC-0013](RFC-0013-skill-tool-contracts.md), [RFC-0016](RFC-0016-tool-operation-log.md)
 - Supersedes: None
 
 ## 1. Scope
@@ -74,6 +74,156 @@ Schema compatibility in the direct v0.2 runtime is exact `SchemaRef` equality.
 Permission evaluability means every declared Action is registered and its
 resource and Scope are complete; the authorization policy still allows or denies
 the actual dispatch.
+
+### 3.2 ContextNode v1
+
+`ContextNodeConfig` embeds one existing `ContextBinding`. It does not introduce a
+binding registry. ContextNode v1 is a data source: `input_schema` is `None`,
+`input_bindings` is empty, and `output_schema` is exactly
+`CONTEXT_NODE_RESULT_SCHEMA`, defined as
+`SchemaRef("core", "context_node_result", "1")`. The node is non-side-effecting,
+requires a stable idempotency identity, and always enables its Checkpoint.
+
+`ContextNodeResult` is the strict durable value contract. It contains
+`contract_version`, `entries`, `completeness`, `missing_keys`, `warnings`,
+`selected_providers`, and `usage`. Version 1 accepts no unknown or missing fields.
+`ContextNodeResultSchemaValidator` parses this exact shape and is registered for
+the fixed result Schema. The runtime converts `ResolvedContext` into this value;
+the ContextProvider contract and Checkpoint wire format remain unchanged.
+
+Before the Workflow enters RUNNING or writes its initial Checkpoint, validation
+requires every binding requirement Schema and the fixed result Schema to be
+registered. Both `core.context.capabilities` and `core.context.provide` must be
+registered and declared for every configured Provider using the exact resource
+`core/context_provider/{provider_id}`.
+
+Execution first authorizes `core.workflow.node.execute`, derives the narrowed node
+`RuntimeCallContext`, and calls only `ContextResolver.resolve`. A partial result is
+successful only for `ALLOW_PARTIAL`; `REQUIRE_COMPLETE` raises
+`partial_context_rejected`. A successful result is validated and persisted through
+`NodeOutputPersistence` before the stable node Checkpoint is committed. Only the
+committed Checkpoint may unlock dependents. Denial, timeout, cancellation, late
+results, Provider or Schema failure, and persistence failure create no successful
+node boundary. Recovery skips a committed ContextNode and replays interrupted work
+with the same idempotency identity.
+
+### 3.3 ContextNode in Plain Language (Non-Normative)
+
+ContextNode is the Workflow equivalent of a read-only data-loading step. The
+Workflow definition says which Context Providers may be consulted and which typed
+pieces of context are required. The node does not receive the Workflow input and
+does not call a Provider directly. It hands the embedded binding to the existing
+ContextResolver, which already knows how to authorize, select, call, cancel, and
+validate Providers.
+
+The result is copied into a small, versioned Workflow-owned JSON document. This
+copy is important: the Workflow needs a stable value it can store and load later,
+instead of placing a live resolver object in a Checkpoint. The actual value is
+stored by NodeOutputPersistence. The Checkpoint stores only the durable reference.
+
+The success sequence is therefore:
+
+```text
+validate definition
+    -> authorize Workflow node execution
+    -> ContextResolver resolves and validates Provider data
+    -> convert to ContextNodeResult and validate its fixed Schema
+    -> persist the result and obtain a durable reference
+    -> commit the Checkpoint by compare-and-set
+    -> mark the node complete and release dependent nodes
+```
+
+There are two intentional crash windows:
+
+1. If the result is durable but the Checkpoint is not committed, recovery treats
+   the node as interrupted. It resolves again with the same idempotency identity;
+   persistence may safely return the existing reference.
+2. If the Checkpoint is committed but the in-memory scheduler was not updated,
+   recovery reads the committed success state and skips Provider execution.
+
+For review, the most important negative guarantee is simple: no denial, timeout,
+cancellation, partial result rejected by policy, malformed Provider result, Schema
+failure, persistence failure, or discarded late result can create a successful
+Checkpoint or release downstream work.
+
+This increment does not add a new Context Provider API, binding registry,
+authorization action, persistence format, Checkpoint field, scheduler, or recovery
+algorithm. It composes existing boundaries and freezes only the Workflow-specific
+config and durable result contracts.
+
+### 3.4 ContextNode Review Checklist (Non-Normative)
+
+- The config and result are frozen, versioned, and reject unknown fields at every
+  nested public boundary.
+- The node has no input binding and always uses the fixed result Schema.
+- Every requirement Schema and both Context actions are registered before RUNNING.
+- Every bound Provider has both actions declared against its exact resource.
+- WorkflowRuntime imports no Provider implementation or Provider registry path.
+- Persistence completes before the successful Checkpoint is constructed and saved.
+- Scheduler completion occurs only after Checkpoint compare-and-set succeeds.
+- Stable recovery skips the Provider; interrupted recovery keeps the same key.
+- Failure and late-result tests assert both zero persistence and zero downstream
+  execution.
+
+### 3.5 SkillNode v1
+
+`SkillNodeConfig` names one exact Skill `CapabilityRef`, one declared resource ID,
+and a positive byte budget. SkillNode has no input, is non-side-effecting, requires
+a stable idempotency identity and Checkpoint, and has the fixed output Schema
+`core/skill_node_result/1`. `SkillNodeResult` is strict, versioned, and contains the
+complete `SkillResource` value.
+
+Validation resolves the Skill through `SkillToolResolver`, checks owner and
+contract version, declaration and byte budget, registered Action, and the exact
+`core/skill_resource/{skill_id}:{resource_id}` permission. Runtime authorizes node
+execution and calls only `SkillResourceGateway.load`. It never receives a loader,
+Plugin implementation, or filesystem path. Result persistence, Checkpoint CAS,
+and downstream unlock occur in that order. Interrupted work reuses the same
+logical identity; committed work is skipped. Sequential replay is permitted while
+overlapping duplicate Plugin reads still conflict.
+
+### 3.6 ToolNode v1
+
+`ToolNodeConfig` contains one exact Tool `CapabilityRef`. The node has exactly one
+whole-value input binding and the fixed output Schema `core/tool_node_result/1`.
+Its side-effect flag must equal the resolved descriptor classification; every Tool
+except an explicit `none` descriptor is treated as side-effecting. External Tools
+require caller-key idempotency and Checkpoint.
+
+`ToolNodeRequest` freezes the `ToolCall`, resolved descriptor snapshot, Scope, and
+node timeout. Canonical JSON is hashed as a lowercase SHA-256 request fingerprint.
+`ToolNodeResult` freezes operation and Tool identity, fingerprint, durable status,
+and exactly one ToolResult or structured error, with optional confirmation
+evidence. Both contracts reject unknown fields and use fixed request/result
+Schemas.
+
+The execution order is normative:
+
+```text
+authorize and preflight
+    -> persist ToolNodeRequest
+    -> prepare ToolOperationRecord
+    -> commit a pending pre-dispatch Checkpoint with operation references
+    -> ToolGateway with ToolExecutionGuard
+    -> persist ToolNodeResult
+    -> finalize ToolOperationRecord
+    -> commit the stable node Checkpoint
+    -> unlock dependents only on succeeded
+```
+
+ToolOperationLog state and CAS are owned by RFC-0016. A recovered `prepared`
+operation may dispatch with the same key and fingerprint. Recovered `dispatching`
+becomes `unknown`; `unknown` never invokes the Tool or unlocks dependents. It
+commits a pending suspension Checkpoint and pauses the same WorkflowRun.
+`ToolOperationSuspension` contains the paused Run, Checkpoint reference, operation
+identity, and record version.
+
+`resolve_tool_operation` accepts `ToolOperationResolution` plus an application
+`RuntimePrincipal`. Resolution requires the expected CAS version and durable
+evidence. Success validates output Schema, persists and finalizes success, resumes
+the same Run, and continues scheduling. Failure persists and finalizes a structured
+error and terminates the Run. Core performs no automatic external query and never
+uses Runtime Events as recovery authority.
 
 ## 4. Graph Validation
 
@@ -165,13 +315,17 @@ and execution policy explicitly define a partial-success shape.
 The first Core reference runtime is deliberately smaller than the complete node
 catalog. It implements the normalized Workflow contracts, validates the DAG
 before execution, schedules dependencies deterministically, executes AgentNode
-by creating child AgentRuns, coordinates ApprovalNode, and composes EvaluationNode
-through the [Evaluation contract](RFC-0012-evaluation.md). Unsupported node
+by creating child AgentRuns, coordinates ApprovalNode, composes EvaluationNode
+through the [Evaluation contract](RFC-0012-evaluation.md), and resolves ContextNode
+through the existing ContextResolver, loads SkillNode through SkillResourceGateway,
+and executes ToolNode through ToolGateway plus the durable Tool Operation Log.
+Unsupported node
 contracts are rejected during validation; they are never silently skipped or
 treated as success.
 
-The reference runtime commits workflow-start and stable AgentNode and
-EvaluationNode boundaries through CheckpointCoordinator. On recovery,
+The reference runtime commits workflow-start and stable AgentNode, ContextNode,
+SkillNode, ToolNode, and EvaluationNode boundaries through CheckpointCoordinator.
+On recovery,
 CheckpointRestorer must finish
 rehydrating stable node outcomes, pending nodes, external references, and
 side-effect identities before dependency scheduling resumes. A node with a
@@ -192,9 +346,8 @@ operation receives `RuntimeCallContext` and returns or consumes a typed, scoped
 `core.workflow.output.persist` and `core.workflow.output.load`. Node dispatch uses
 `core.workflow.node.execute` v1. The Checkpoint wire contract remains unchanged.
 
-ApprovalNode composes the existing durable ApprovalCoordinator. SkillNode,
-ToolNode, ContextNode, custom node registration, and external Workflow engine
-adapters are later slices.
+ApprovalNode composes the existing durable ApprovalCoordinator. Custom node
+registration and external Workflow engine adapters are later slices.
 Delivering the smaller reference runtime does not change this RFC to Implemented;
 full conformance still requires the complete contract below.
 
@@ -211,5 +364,8 @@ A conforming implementation demonstrates:
 - Authorization before every node dispatch.
 - Approval checkpoint and resume behavior.
 - Cancellation propagation.
+- SkillNode resource authorization, persistence ordering, and stable replay.
+- ToolNode request fingerprint, operation-log CAS, unknown suspension, and explicit
+  resolution behavior.
 - Replaceable engine adapters with identical public outcomes.
 - Recovery behavior defined by RFC-0011.

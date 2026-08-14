@@ -1,0 +1,48 @@
+{
+  "run": {
+    "run_id": "71c6e8e6-c044-4a55-b35a-1182f5602afb",
+    "kind": "workflow",
+    "definition_id": "workflow-tool-definition-1",
+    "root_run_id": "71c6e8e6-c044-4a55-b35a-1182f5602afb",
+    "parent_run_id": null,
+    "workspace_id": "workspace-1",
+    "session_ref": {
+      "namespace": "test",
+      "session_id": "session-1"
+    },
+    "scope": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    },
+    "status": "paused",
+    "attempt": 1,
+    "state_version": 7,
+    "created_at": "2026-08-10T12:00:00+00:00",
+    "started_at": "2026-08-10T12:00:00+00:00",
+    "updated_at": "2026-08-10T12:00:00+00:00",
+    "ended_at": null,
+    "error_summary": null,
+    "continuation_status": "running",
+    "attempt_history": [
+      {
+        "attempt": 1,
+        "started_at": "2026-08-10T12:00:00+00:00",
+        "ended_at": null,
+        "outcome": null,
+        "checkpoint_ref": null,
+        "error": null
+      }
+    ],
+    "control_policy": {
+      "audit_failure_mode": "pause"
+    },
+    "workflow_id": "workflow-tool-1",
+    "graph_version": "1",
+    "latest_checkpoint_ref": "05ac2bcc-27d8-4042-bc70-1656ccf7d00f"
+  },
+  "checkpoint_ref": "05ac2bcc-27d8-4042-bc70-1656ccf7d00f",
+  "operation_id": "workflow-tool-7d86c0975b20563c325c94fb8962d36004103de6122415fb34133e595e536c9c",
+  "record_version": 2
+}

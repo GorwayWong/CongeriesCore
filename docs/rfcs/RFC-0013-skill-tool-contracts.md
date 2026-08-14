@@ -6,8 +6,8 @@
 - Target Version: 0.2.0
 - Owner: CongeriesCore Maintainers
 - Created: 2026-08-11
-- Updated: 2026-08-11
-- Related: [Requirements](../../requirements.md), [Design](../../design.md), [RFC-0002](RFC-0002-plugin-sdk.md), [RFC-0008](RFC-0008-scope-authorization.md), [RFC-0010](RFC-0010-runtime-events.md)
+- Updated: 2026-08-12
+- Related: [Requirements](../../requirements.md), [Design](../../design.md), [RFC-0002](RFC-0002-plugin-sdk.md), [RFC-0008](RFC-0008-scope-authorization.md), [RFC-0010](RFC-0010-runtime-events.md), [RFC-0016](RFC-0016-tool-operation-log.md)
 - Supersedes: None
 
 ## 1. Scope
@@ -16,8 +16,9 @@ This RFC defines immutable Skill v1 and Tool v1 contracts, their typed views ove
 the Plugin registry, progressive Skill resource loading, authorized Tool
 execution, shared reference resolution, and AgentSpec compatibility. Concrete
 instructions, scripts, Tool business behavior, Plugin loading technology, MCP,
-Workflow SkillNode/ToolNode scheduling, Agent Tool loops, and automatic context
-injection are outside this RFC.
+Workflow scheduling, Agent Tool loops, and automatic context injection are outside
+this RFC. RFC-0003 composes these gateways into SkillNode and ToolNode; RFC-0016
+owns durable Tool operation state.
 
 ### 1.1 Plain-language overview
 
@@ -38,7 +39,7 @@ AgentSpec stores references to these capabilities, not implementation objects.
 AgentRuntime checks that every referenced Skill and Tool currently exists and is
 compatible before changing Run state or calling Context or Model providers. It
 still does not load Skill content or execute a Model's Tool proposal. MCP and
-Workflow SkillNode/ToolNode execution remain separate future boundaries.
+Workflow node composition remain separate boundaries.
 
 ## 2. Versioned Capability References
 
@@ -81,6 +82,11 @@ the final size check. DRAINING rejects new reads while an existing leased read
 may complete. Results are returned to the caller and are never inserted into an
 Agent context implicitly.
 
+Lease generation is distinct from stable operation identity. A completed Skill
+read may be replayed sequentially with the same logical identity, but overlapping
+duplicate reads still conflict. This permits at-least-once Workflow recovery
+without allowing concurrent duplicate Plugin work.
+
 ## 4. Tool v1
 
 `ToolDescriptor` contains an exact Tool reference, title, summary, input and
@@ -109,6 +115,7 @@ resolve registration and descriptor
     -> validate call shape and input Schema
     -> authorize Action/resource and narrow Scope/constraints
     -> acquire one owning Plugin lease
+    -> invoke the optional durable execution guard
     -> execute all attempts with one operation identity and whole-call deadline
     -> validate output Schema
     -> release the lease in finally
@@ -121,7 +128,14 @@ structured errors marked `retryable=True` and normalized executor failures are
 retried. Denied, invalid grant, input/output Schema, and protocol failures are
 not retried. Ordinary executor exceptions become redacted retryable unavailable
 errors. A released lease identity cannot silently start another side effect;
-reuse returns `lease_identity_conflict`.
+reuse returns `lease_identity_conflict`. Side-effect-free Tools may replay
+sequentially with the same logical identity; external side-effecting Tools may not.
+
+When supplied, `ToolExecutionGuard` runs after resolution, input validation,
+authorization, grant validation, and lease acquisition, but before the first
+executor attempt. It runs once for the whole invocation. Guard failure enters no
+executor. RFC-0016 uses this hook to make `dispatching` durable before external
+execution; retries retain the same operation identity and do not rerun the guard.
 
 ## 5. Registration and Implementation Access
 
@@ -146,12 +160,12 @@ has top-level `contract_version: "2"` and versioned `CapabilityRef` values.
 an unowned legacy reference remains readable but cannot be upgraded or resolved
 until an owning extension is supplied.
 
-`SkillToolResolver` is shared by AgentRuntime and future Workflow adapters.
+`SkillToolResolver` is shared by AgentRuntime and Workflow adapters.
 AgentRuntime preflights every Skill and Tool reference before Run transition,
 Context resolution, or Model invocation. The current Model request receives only
 resource identities. AgentRuntime does not load Skill resources and does not
-execute Tool proposals. Workflow SkillNode and ToolNode contracts remain
-unsupported by the validator and runtime.
+execute Tool proposals. Workflow SkillNode and ToolNode execution is defined by
+RFC-0003 and remains outside AgentRuntime.
 
 ## 7. Authorization, Events, and Errors
 

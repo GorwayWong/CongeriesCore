@@ -1,0 +1,32 @@
+{
+  "contract_version": "1",
+  "operation_id": "operation-1",
+  "expected_version": 2,
+  "status": "succeeded",
+  "evidence_ref": {
+    "resource_type": "tool_evidence",
+    "resource": {
+      "namespace": "test",
+      "kind": "tool_evidence",
+      "id": "evidence-1",
+      "owning_extension": null
+    },
+    "scope": {
+      "namespace": "core",
+      "kind": "run",
+      "id": "node-tool",
+      "parent": {
+        "namespace": "core",
+        "kind": "workspace",
+        "id": "workspace-1",
+        "parent": null
+      }
+    },
+    "version": "1"
+  },
+  "output": {
+    "value": "confirmed"
+  },
+  "error": null,
+  "attempts": 1
+}

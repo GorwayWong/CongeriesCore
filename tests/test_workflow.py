@@ -6,6 +6,16 @@ import pytest
 
 from congeries_core.evaluation import EVALUATION_RESULT_SCHEMA, evaluation_actions
 from congeries_core.policy.authorization import ActionRef, ActionRegistry, ResourceRef
+from congeries_core.provider.context import (
+    ContextBinding,
+    ContextCompleteness,
+    ContextEntry,
+    ContextKey,
+    ContextRequirement,
+    ContextUsage,
+    ResolvedContext,
+    context_actions,
+)
 from congeries_core.runtime.errors import CoreError
 from congeries_core.runtime.ids import (
     AgentId,
@@ -16,10 +26,15 @@ from congeries_core.runtime.ids import (
     ResourceId,
     WorkflowId,
 )
+from congeries_core.runtime.json_types import as_json_value
 from congeries_core.runtime.schema import SchemaRef, SchemaRegistry
 from congeries_core.workflow import (
+    CONTEXT_NODE_RESULT_SCHEMA,
     WORKFLOW_NODE_EXECUTE_ACTION,
     AgentNodeConfig,
+    ContextNodeConfig,
+    ContextNodeResult,
+    ContextNodeResultSchemaValidator,
     DeterministicScheduler,
     EvaluationNodeConfig,
     ExecutionPolicy,
@@ -119,6 +134,43 @@ def _evaluation_node() -> WorkflowNode:
     )
 
 
+def _context_node() -> WorkflowNode:
+    provider_id = ProviderId("context-1")
+    permissions = (
+        _permission(),
+        *(
+            WorkflowPermission(
+                action,
+                ResourceRef("core", "context_provider", ResourceId(provider_id.value)),
+            )
+            for action in context_actions()
+        ),
+    )
+    return WorkflowNode(
+        node_id=NodeId("context"),
+        node_type=WorkflowNodeType.CONTEXT.value,
+        contract_version="1",
+        input_schema=None,
+        input_bindings=(),
+        output_schema=CONTEXT_NODE_RESULT_SCHEMA,
+        scope=child_scope(),
+        permissions=permissions,
+        timeout_seconds=30,
+        retry_limit=0,
+        side_effecting=False,
+        idempotency_required=True,
+        checkpoint=True,
+        config=ContextNodeConfig(
+            ContextBinding(
+                provider_ids=(provider_id,),
+                requirements=(
+                    ContextRequirement(ContextKey("test", "profile"), SCHEMA),
+                ),
+            )
+        ),
+    )
+
+
 def _definition(
     nodes: tuple[WorkflowNode, ...] | None = None,
     dependencies: tuple[WorkflowDependency, ...] = (),
@@ -146,7 +198,12 @@ def _validator(
 ) -> WorkflowValidator:
     registry = SchemaRegistry()
     for schema in schemas:
-        registry.register(schema, StringObjectValidator())
+        registry.register(
+            schema,
+            ContextNodeResultSchemaValidator()
+            if schema == CONTEXT_NODE_RESULT_SCHEMA
+            else StringObjectValidator(),
+        )
     return WorkflowValidator(
         schemas=registry,
         actions=ActionRegistry(actions),
@@ -204,7 +261,7 @@ def test_workflow_definition_is_frozen_strict_and_round_trips() -> None:
                     ),
                 ),
             ),
-            "workflow_node_contract_unsupported",
+            "workflow_tool_config_invalid",
         ),
         (
             replace(
@@ -364,3 +421,124 @@ def test_evaluation_node_round_trips_and_requires_fixed_contract() -> None:
                 schemas=(SCHEMA, EVALUATION_RESULT_SCHEMA), actions=actions
             ).validate(invalid)
         assert error.value.detail.code == code
+
+
+def test_context_node_contract_result_and_validation_are_frozen() -> None:
+    node = _context_node()
+    definition = replace(
+        _definition(nodes=(node,)),
+        output_schema=CONTEXT_NODE_RESULT_SCHEMA,
+        output_binding=WorkflowOutputBinding(node.node_id),
+    )
+    actions = (*workflow_actions(), *context_actions())
+    validator = _validator(
+        schemas=(SCHEMA, CONTEXT_NODE_RESULT_SCHEMA), actions=actions
+    )
+    assert validator.validate(definition).topological_order == (node.node_id,)
+    assert WorkflowDefinition.from_data(definition.to_data()) == definition
+
+    resolved = ResolvedContext(
+        entries=(
+            ContextEntry(
+                ContextKey("test", "profile"),
+                SCHEMA,
+                {"value": "Ada"},
+                ("context-1",),
+            ),
+        ),
+        completeness=ContextCompleteness.COMPLETE,
+        missing_keys=(),
+        warnings=(),
+        selected_providers=(ProviderId("context-1"),),
+        usage=ContextUsage(15),
+    )
+    result = ContextNodeResult.from_resolved(resolved)
+    assert ContextNodeResult.from_data(result.to_data()) == result
+    ContextNodeResultSchemaValidator().validate(
+        as_json_value(result.to_data(), "ContextNode result")
+    )
+    with pytest.raises(FrozenInstanceError):
+        result.contract_version = "2"  # type: ignore[misc]
+    with pytest.raises(ValueError, match="unknown or missing"):
+        ContextNodeResult.from_data({**result.to_data(), "extra": True})
+    with pytest.raises(ValueError, match="unsupported"):
+        ContextNodeResult.from_data({**result.to_data(), "contract_version": "2"})
+
+    invalid_cases = (
+        (
+            replace(node, input_schema=SCHEMA),
+            "workflow_context_contract_invalid",
+        ),
+        (
+            replace(node, output_schema=SCHEMA),
+            "workflow_context_contract_invalid",
+        ),
+        (
+            replace(node, side_effecting=True),
+            "workflow_context_side_effect_invalid",
+        ),
+        (
+            replace(node, idempotency_required=False),
+            "workflow_context_idempotency_required",
+        ),
+        (
+            replace(node, permissions=(_permission(),)),
+            "workflow_context_permission_missing",
+        ),
+        (
+            replace(
+                node,
+                permissions=(
+                    node.permissions[0],
+                    replace(
+                        node.permissions[1],
+                        resource=ResourceRef(
+                            "core", "context_provider", ResourceId("wrong")
+                        ),
+                    ),
+                    node.permissions[2],
+                ),
+            ),
+            "workflow_context_permission_resource_invalid",
+        ),
+    )
+    for changed, code in invalid_cases:
+        invalid = replace(
+            definition,
+            nodes=(changed,),
+            output_schema=changed.output_schema or CONTEXT_NODE_RESULT_SCHEMA,
+        )
+        with pytest.raises(CoreError) as error:
+            validator.validate(invalid)
+        assert error.value.detail.code == code
+
+    missing_requirement = SchemaRef("test", "missing_context", "1")
+    assert isinstance(node.config, ContextNodeConfig)
+    missing_schema_node = replace(
+        node,
+        config=ContextNodeConfig(
+            replace(
+                node.config.binding,
+                requirements=(
+                    ContextRequirement(
+                        ContextKey("test", "profile"), missing_requirement
+                    ),
+                ),
+            )
+        ),
+    )
+    with pytest.raises(CoreError) as missing_schema:
+        _validator(
+            schemas=(SCHEMA, CONTEXT_NODE_RESULT_SCHEMA), actions=actions
+        ).validate(replace(definition, nodes=(missing_schema_node,)))
+    assert (
+        missing_schema.value.detail.code
+        == "workflow_context_requirement_schema_missing"
+    )
+
+    with pytest.raises(CoreError) as missing_action:
+        _validator(
+            schemas=(SCHEMA, CONTEXT_NODE_RESULT_SCHEMA),
+            actions=(*workflow_actions(), context_actions()[0]),
+        ).validate(definition)
+    assert missing_action.value.detail.code == "workflow_permission_not_evaluable"

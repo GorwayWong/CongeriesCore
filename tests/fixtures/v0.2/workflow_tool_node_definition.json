@@ -1,0 +1,103 @@
+{
+  "contract_version": "1",
+  "workflow_id": "workflow-tool-1",
+  "definition_id": "workflow-tool-definition-1",
+  "version": "1",
+  "input_schema": {
+    "namespace": "test",
+    "name": "workflow_value",
+    "version": "1"
+  },
+  "nodes": [
+    {
+      "node_id": "tool",
+      "node_type": "tool",
+      "contract_version": "1",
+      "input_schema": {
+        "namespace": "test",
+        "name": "workflow_value",
+        "version": "1"
+      },
+      "input_bindings": [
+        {
+          "source": "workflow_input",
+          "source_node_id": null
+        }
+      ],
+      "output_schema": {
+        "namespace": "core",
+        "name": "tool_node_result",
+        "version": "1"
+      },
+      "scope": {
+        "namespace": "core",
+        "kind": "run",
+        "id": "node-tool",
+        "parent": {
+          "namespace": "core",
+          "kind": "workspace",
+          "id": "workspace-1",
+          "parent": null
+        }
+      },
+      "permissions": [
+        {
+          "action": {
+            "namespace": "core",
+            "name": "workflow.node.execute",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "workflow_node",
+            "id": "tool",
+            "owning_extension": null
+          }
+        },
+        {
+          "action": {
+            "namespace": "core",
+            "name": "tool.execute",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "tool",
+            "id": "workflow-tool",
+            "owning_extension": "test-plugin"
+          }
+        }
+      ],
+      "timeout_seconds": 10,
+      "retry_limit": 0,
+      "side_effecting": true,
+      "idempotency_required": true,
+      "checkpoint": true,
+      "config": {
+        "tool": {
+          "namespace": "core",
+          "kind": "tool",
+          "id": "workflow-tool",
+          "owning_extension": "test-plugin",
+          "contract_version": "1"
+        }
+      }
+    }
+  ],
+  "dependencies": [],
+  "output_schema": {
+    "namespace": "core",
+    "name": "tool_node_result",
+    "version": "1"
+  },
+  "output_binding": {
+    "source_node_id": "tool",
+    "required": true
+  },
+  "execution_policy": {
+    "max_concurrency": 1,
+    "failure_mode": "fail_fast",
+    "compensation_enabled": false,
+    "max_attempts": 1
+  }
+}

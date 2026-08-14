@@ -57,6 +57,7 @@ class PluginCapabilityInvoker:
         operation: CapabilityOperation[ResultT],
         constraints: Mapping[str, JsonValue] | None = None,
         resource_validator: CapabilityResourceValidator | None = None,
+        allow_completed_replay: bool = False,
     ) -> ResultT:
         registration = self._registry.get(capability_key)
         if registration.owner.name != plugin_id:
@@ -124,7 +125,10 @@ class PluginCapabilityInvoker:
             # callback below is the sole place the opaque implementation is
             # usable, and finally keeps drain/unload safe on every exit path.
             lease = await self._lifecycle.acquire(
-                plugin_id, capability_key, call.context
+                plugin_id,
+                capability_key,
+                call.context,
+                allow_completed_replay=allow_completed_replay,
             )
             try:
                 return await await_provider(

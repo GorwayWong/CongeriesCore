@@ -1,0 +1,28 @@
+{
+  "contract_version": "1",
+  "entries": [],
+  "completeness": "partial",
+  "missing_keys": [
+    {
+      "namespace": "test",
+      "name": "profile"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "profile_unavailable",
+      "message": "Profile context is unavailable",
+      "key": {
+        "namespace": "test",
+        "name": "profile"
+      }
+    }
+  ],
+  "selected_providers": [
+    "context-a"
+  ],
+  "usage": {
+    "byte_count": 0,
+    "token_count": null
+  }
+}

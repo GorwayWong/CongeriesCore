@@ -16,6 +16,7 @@ interface details belong to the linked RFCs.
 | [ADR-0007](ADR-0007-default-deny-scope.md) | Scope authorization denies by default | Accepted |
 | [ADR-0008](ADR-0008-at-least-once-recovery.md) | Recovery is at least once | Accepted |
 | [ADR-0009](ADR-0009-safe-plugin-unload.md) | Plugin unload drains active work | Accepted |
+| [ADR-0010](ADR-0010-tool-unknown-operation-log.md) | Unknown Tool outcomes use a durable operation log and explicit resolution | Accepted |
 
 The documentation lifecycle and metadata rules are defined in
 [docs/README.md](../README.md).

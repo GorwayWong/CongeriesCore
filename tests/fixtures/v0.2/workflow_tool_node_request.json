@@ -1,0 +1,59 @@
+{
+  "contract_version": "1",
+  "call": {
+    "tool": {
+      "namespace": "core",
+      "kind": "tool",
+      "id": "workflow-tool",
+      "owning_extension": "test-plugin",
+      "contract_version": "1"
+    },
+    "input": {
+      "value": "hello"
+    }
+  },
+  "descriptor": {
+    "ref": {
+      "namespace": "core",
+      "kind": "tool",
+      "id": "workflow-tool",
+      "owning_extension": "test-plugin",
+      "contract_version": "1"
+    },
+    "title": "Workflow Tool",
+    "summary": "A side-effecting workflow test Tool",
+    "input_schema": {
+      "namespace": "test",
+      "name": "workflow_value",
+      "version": "1"
+    },
+    "output_schema": {
+      "namespace": "test",
+      "name": "workflow_value",
+      "version": "1"
+    },
+    "action": {
+      "namespace": "core",
+      "name": "tool.execute",
+      "version": "1"
+    },
+    "execution_policy": {
+      "timeout_ms": 10000,
+      "max_attempts": 1
+    },
+    "side_effect": "external",
+    "idempotency": "caller_key"
+  },
+  "scope": {
+    "namespace": "core",
+    "kind": "run",
+    "id": "node-tool",
+    "parent": {
+      "namespace": "core",
+      "kind": "workspace",
+      "id": "workspace-1",
+      "parent": null
+    }
+  },
+  "timeout_seconds": 10
+}

@@ -33,7 +33,13 @@ from congeries_core.runtime.ids import PrincipalId
 from congeries_core.runtime.json_types import JsonValue, as_json_value
 from congeries_core.runtime.schema import SchemaRef, SchemaRegistry
 
-from .model import ToolCall, ToolDescriptor, ToolImplementation, ToolResult
+from .model import (
+    ToolCall,
+    ToolDescriptor,
+    ToolImplementation,
+    ToolResult,
+    ToolSideEffect,
+)
 from .registry import ToolRegistry
 
 TOOL_INVOCATION_STARTED = "core.tool.invocation_started"
@@ -46,6 +52,17 @@ class _AttemptAwareExecutor(Protocol):
     async def execute_attempt(
         self, call: ToolCall, context: RuntimeCallContext, attempt: int
     ) -> JsonValue: ...
+
+
+class ToolExecutionGuard(Protocol):
+    """Durable boundary entered once immediately before executor attempt one."""
+
+    async def before_execute(
+        self,
+        call: ToolCall,
+        descriptor: ToolDescriptor,
+        context: RuntimeCallContext,
+    ) -> None: ...
 
 
 class ToolGateway:
@@ -64,7 +81,13 @@ class ToolGateway:
         self._clock = clock
         self._events = events or NullProviderEventPublisher()
 
-    async def execute(self, call: ToolCall, context: RuntimeCallContext) -> ToolResult:
+    async def execute(
+        self,
+        call: ToolCall,
+        context: RuntimeCallContext,
+        *,
+        guard: ToolExecutionGuard | None = None,
+    ) -> ToolResult:
         started_at = self._clock.now()
         if context.idempotency_key is None:
             raise core_error(
@@ -104,6 +127,8 @@ class ToolGateway:
                 effective_context = self._with_timeout(
                     authorized.context, timeout_ms, started_at
                 )
+                if guard is not None:
+                    await guard.before_execute(call, descriptor, effective_context)
                 attempts = 0
                 while True:
                     attempts += 1
@@ -144,6 +169,7 @@ class ToolGateway:
                 ),
                 constraints=constraints,
                 operation=operation,
+                allow_completed_replay=(descriptor.side_effect is ToolSideEffect.NONE),
             )
             await self._emit(
                 TOOL_INVOCATION_COMPLETED,

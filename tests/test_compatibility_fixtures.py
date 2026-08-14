@@ -62,10 +62,18 @@ from congeries_core.state.workspace import WorkspaceState
 from congeries_core.tool import (
     ToolCall,
     ToolDescriptor,
+    ToolOperationRecord,
     ToolResult,
     tool_actions,
+    tool_operation_actions,
 )
 from congeries_core.workflow import (
+    ContextNodeResult,
+    SkillNodeResult,
+    ToolNodeRequest,
+    ToolNodeResult,
+    ToolOperationResolution,
+    ToolOperationSuspension,
     WorkflowContext,
     WorkflowDefinition,
     WorkflowResult,
@@ -286,9 +294,36 @@ def test_checkpoint_approval_migration_and_action_v02_fixtures() -> None:
 def test_workflow_v02_fixtures_round_trip_exactly() -> None:
     for name, contract in (
         ("workflow_definition.json", WorkflowDefinition),
+        ("workflow_context_node_definition.json", WorkflowDefinition),
+        ("workflow_skill_node_definition.json", WorkflowDefinition),
+        ("workflow_tool_node_definition.json", WorkflowDefinition),
         ("workflow_context.json", WorkflowContext),
         ("workflow_result.json", WorkflowResult),
         ("workflow_suspension.json", WorkflowSuspension),
+    ):
+        value = contract.from_data(_object(name))
+        assert contract.from_data(value.to_data()) == value
+        assert _serialized(value.to_data()) == _text(name)
+
+    for name in (
+        "workflow_context_node_result_complete.json",
+        "workflow_context_node_result_partial.json",
+    ):
+        value = ContextNodeResult.from_data(_object(name))
+        assert ContextNodeResult.from_data(value.to_data()) == value
+        assert _serialized(value.to_data()) == _text(name)
+
+    skill_result = SkillNodeResult.from_data(_object("workflow_skill_node_result.json"))
+    assert SkillNodeResult.from_data(skill_result.to_data()) == skill_result
+    assert _serialized(skill_result.to_data()) == _text(
+        "workflow_skill_node_result.json"
+    )
+
+    for name, contract in (
+        ("workflow_tool_node_request.json", ToolNodeRequest),
+        ("workflow_tool_node_result.json", ToolNodeResult),
+        ("workflow_tool_operation_resolution.json", ToolOperationResolution),
+        ("workflow_tool_operation_suspension.json", ToolOperationSuspension),
     ):
         value = contract.from_data(_object(name))
         assert contract.from_data(value.to_data()) == value
@@ -379,3 +414,19 @@ def test_skill_and_tool_v1_fixtures_round_trip_exactly() -> None:
         )
         assert actions == expected
         assert _serialized([action.to_data() for action in actions]) == _text(name)
+
+    operation = ToolOperationRecord.from_data(
+        _object("tool_operation_record_prepared.json")
+    )
+    assert ToolOperationRecord.from_data(operation.to_data()) == operation
+    assert _serialized(operation.to_data()) == _text(
+        "tool_operation_record_prepared.json"
+    )
+    values = as_array(
+        json.loads(_text("tool_operation_actions.json")), "Tool operation actions"
+    )
+    operation_actions = tuple(
+        ActionRef.from_data(as_object(item, "Tool operation action"))
+        for item in values
+    )
+    assert operation_actions == tool_operation_actions()

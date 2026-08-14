@@ -7,14 +7,23 @@ from typing import NoReturn
 
 from congeries_core.evaluation import EVALUATION_RESULT_SCHEMA, evaluation_actions
 from congeries_core.policy.authorization import ActionRegistry
+from congeries_core.provider.context import context_actions
 from congeries_core.runtime.errors import ErrorCategory, core_error
 from congeries_core.runtime.ids import NodeId
 from congeries_core.runtime.schema import SchemaRef, SchemaRegistry
+from congeries_core.skill import SKILL_RESOURCE_READ_ACTION, SkillToolResolver
+from congeries_core.tool import ToolIdempotencyMode, ToolSideEffect
 
 from .model import (
+    CONTEXT_NODE_RESULT_SCHEMA,
+    SKILL_NODE_RESULT_SCHEMA,
+    TOOL_NODE_RESULT_SCHEMA,
     AgentNodeConfig,
     ApprovalNodeConfig,
+    ContextNodeConfig,
     EvaluationNodeConfig,
+    SkillNodeConfig,
+    ToolNodeConfig,
     WorkflowDefinition,
     WorkflowInputSource,
     WorkflowNode,
@@ -36,14 +45,19 @@ class WorkflowValidator:
         schemas: SchemaRegistry,
         actions: ActionRegistry,
         supported_nodes: frozenset[tuple[str, str]] | None = None,
+        skill_tools: SkillToolResolver | None = None,
     ) -> None:
         self._schemas = schemas
         self._actions = actions
+        self._skill_tools = skill_tools
         self._supported = supported_nodes or frozenset(
             {
                 (WorkflowNodeType.AGENT.value, "1"),
                 (WorkflowNodeType.APPROVAL.value, "1"),
+                (WorkflowNodeType.CONTEXT.value, "1"),
                 (WorkflowNodeType.EVALUATION.value, "1"),
+                (WorkflowNodeType.SKILL.value, "1"),
+                (WorkflowNodeType.TOOL.value, "1"),
             }
         )
 
@@ -156,6 +170,175 @@ class WorkflowValidator:
                 self._invalid(
                     "workflow_agent_contract_incomplete",
                     "AgentNode requires one input binding and input/output schemas",
+                )
+        elif node.node_type == WorkflowNodeType.SKILL.value:
+            if not isinstance(node.config, SkillNodeConfig):
+                self._invalid(
+                    "workflow_skill_config_invalid",
+                    "SkillNode requires SkillNodeConfig",
+                )
+            if (
+                node.input_schema is not None
+                or node.input_bindings
+                or node.output_schema != SKILL_NODE_RESULT_SCHEMA
+            ):
+                self._invalid(
+                    "workflow_skill_contract_invalid",
+                    "SkillNode accepts no input and requires the fixed result schema",
+                )
+            if node.side_effecting:
+                self._invalid(
+                    "workflow_skill_side_effect_invalid",
+                    "SkillNode must be non-side-effecting",
+                )
+            if not node.idempotency_required:
+                self._invalid(
+                    "workflow_skill_idempotency_required",
+                    "SkillNode requires a stable idempotency identity",
+                )
+            if self._skill_tools is None:
+                raise core_error(
+                    ErrorCategory.UNSUPPORTED_CAPABILITY,
+                    "workflow_skill_resolver_unavailable",
+                    "Workflow validation has no SkillToolResolver",
+                )
+            resolved = self._skill_tools.resolve_skill(node.config.skill)
+            try:
+                descriptor = resolved.descriptor.resource(node.config.resource_id)
+            except KeyError:
+                self._invalid(
+                    "workflow_skill_resource_undeclared",
+                    "SkillNode resource is not declared",
+                )
+            if node.config.max_bytes > descriptor.max_bytes:
+                self._invalid(
+                    "workflow_skill_budget_exceeded",
+                    "SkillNode budget exceeds the declared resource budget",
+                )
+            expected_resource = (
+                "core",
+                "skill_resource",
+                f"{node.config.skill.id.value}:{node.config.resource_id.value}",
+                node.config.skill.owning_extension,
+            )
+            if not any(
+                permission.action == SKILL_RESOURCE_READ_ACTION
+                and (
+                    permission.resource.namespace,
+                    permission.resource.kind,
+                    permission.resource.id.value,
+                    permission.resource.owning_extension,
+                )
+                == expected_resource
+                for permission in node.permissions
+            ):
+                self._invalid(
+                    "workflow_skill_permission_resource_invalid",
+                    "Skill permission resource does not match the configured resource",
+                )
+        elif node.node_type == WorkflowNodeType.CONTEXT.value:
+            # ContextNode is a root data source, not a transform over Workflow
+            # input. Freezing this shape prevents accidental input coercion and
+            # guarantees every consumer sees the same persisted result contract.
+            if not isinstance(node.config, ContextNodeConfig):
+                self._invalid(
+                    "workflow_context_config_invalid",
+                    "ContextNode requires ContextNodeConfig",
+                )
+            if (
+                node.input_schema is not None
+                or node.input_bindings
+                or node.output_schema != CONTEXT_NODE_RESULT_SCHEMA
+            ):
+                self._invalid(
+                    "workflow_context_contract_invalid",
+                    "ContextNode accepts no input and requires the fixed result schema",
+                )
+            if node.side_effecting:
+                self._invalid(
+                    "workflow_context_side_effect_invalid",
+                    "ContextNode must be declared non-side-effecting",
+                )
+            if not node.idempotency_required:
+                self._invalid(
+                    "workflow_context_idempotency_required",
+                    "ContextNode requires a stable idempotency identity",
+                )
+            for requirement in node.config.binding.requirements:
+                self._require_schema(
+                    requirement.schema,
+                    "workflow_context_requirement_schema_missing",
+                )
+            declared = {permission.action for permission in node.permissions}
+            # Both resolver phases are authorized independently. Declaring only
+            # context.provide would still fail during capabilities discovery, so
+            # reject the incomplete definition before the Run starts.
+            if any(action not in declared for action in context_actions()):
+                self._invalid(
+                    "workflow_context_permission_missing",
+                    "ContextNode must declare every Context action",
+                )
+            for provider_id in node.config.binding.provider_ids:
+                for action in context_actions():
+                    # Action presence is not enough: the permission must name the
+                    # exact Provider the embedded binding can dispatch. Otherwise
+                    # config A could execute using permission granted for B.
+                    if not any(
+                        permission.action == action
+                        and permission.resource.namespace == "core"
+                        and permission.resource.kind == "context_provider"
+                        and permission.resource.id.value == provider_id.value
+                        and permission.resource.owning_extension is None
+                        for permission in node.permissions
+                    ):
+                        self._invalid(
+                            "workflow_context_permission_resource_invalid",
+                            "Context permission resource does not match node binding",
+                        )
+        elif node.node_type == WorkflowNodeType.TOOL.value:
+            if not isinstance(node.config, ToolNodeConfig):
+                self._invalid(
+                    "workflow_tool_config_invalid", "ToolNode requires ToolNodeConfig"
+                )
+            if self._skill_tools is None:
+                raise core_error(
+                    ErrorCategory.UNSUPPORTED_CAPABILITY,
+                    "workflow_tool_resolver_unavailable",
+                    "Workflow validation has no SkillToolResolver",
+                )
+            descriptor = self._skill_tools.resolve_tool(node.config.tool).descriptor
+            if (
+                node.input_schema != descriptor.input_schema
+                or len(node.input_bindings) != 1
+                or node.output_schema != TOOL_NODE_RESULT_SCHEMA
+            ):
+                self._invalid(
+                    "workflow_tool_contract_invalid",
+                    "ToolNode requires one descriptor input and the fixed "
+                    "result schema",
+                )
+            expected_side_effecting = descriptor.side_effect is not ToolSideEffect.NONE
+            if node.side_effecting != expected_side_effecting:
+                self._invalid(
+                    "workflow_tool_side_effect_invalid",
+                    "ToolNode side-effect declaration does not match its descriptor",
+                )
+            if expected_side_effecting and (
+                not node.idempotency_required
+                or descriptor.idempotency is not ToolIdempotencyMode.CALLER_KEY
+            ):
+                self._invalid(
+                    "workflow_tool_idempotency_required",
+                    "side-effecting ToolNode requires caller-key idempotency",
+                )
+            if not any(
+                permission.action == descriptor.action
+                and permission.resource == descriptor.ref.resource
+                for permission in node.permissions
+            ):
+                self._invalid(
+                    "workflow_tool_permission_resource_invalid",
+                    "Tool permission resource does not match the configured Tool",
                 )
         elif node.node_type == WorkflowNodeType.APPROVAL.value:
             if not isinstance(node.config, ApprovalNodeConfig):
@@ -324,10 +507,19 @@ class WorkflowValidator:
                 "Workflow and source node output schemas must match exactly",
             )
 
+        # ContextNode has no Workflow input by design, but it is still a valid
+        # graph root because it produces data from an authorized Provider. Without
+        # this seed the required-output check would incorrectly call every
+        # ContextNode-only Workflow unreachable.
         reachable = {
             node.node_id
             for node in definition.nodes
-            if any(
+            if node.node_type
+            in {
+                WorkflowNodeType.CONTEXT.value,
+                WorkflowNodeType.SKILL.value,
+            }
+            or any(
                 binding.source is WorkflowInputSource.WORKFLOW_INPUT
                 for binding in node.input_bindings
             )

@@ -78,6 +78,7 @@ class PluginLifecycleController:
         self._conditions: dict[str, asyncio.Condition] = {}
         self._leases: dict[str, dict[str, ExecutionLease]] = {}
         self._released: dict[str, set[str]] = {}
+        self._lease_generations: dict[str, dict[str, int]] = {}
         self._invocations: dict[str, dict[str, _InvocationReservation]] = {}
 
     async def discover(self, manifest: PluginManifest) -> PluginStateRecord:
@@ -101,6 +102,7 @@ class PluginLifecycleController:
             self._records[manifest.name] = record
             self._leases[manifest.name] = {}
             self._released[manifest.name] = set()
+            self._lease_generations[manifest.name] = {}
             self._invocations[manifest.name] = {}
             return record
 
@@ -183,6 +185,8 @@ class PluginLifecycleController:
         plugin_id: str,
         capability_key: CapabilityKey,
         context: RuntimeCallContext,
+        *,
+        allow_completed_replay: bool = False,
     ) -> ExecutionLease:
         invocation = context.idempotency_key
         if invocation is None:
@@ -224,15 +228,28 @@ class PluginLifecycleController:
                     plugin=plugin_id,
                     capability=capability_key[1],
                 )
+            generation = self._lease_generations[plugin_id].get(invocation.value, 0)
             lease_id = _lease_id(
                 current.ref,
                 current.activation_epoch,
                 capability_key,
                 context.run_id,
                 invocation.value,
+                generation,
             )
             if lease_id in self._released[plugin_id]:
-                raise self._lease_conflict(plugin_id, capability_key[1])
+                if not allow_completed_replay:
+                    raise self._lease_conflict(plugin_id, capability_key[1])
+                generation += 1
+                self._lease_generations[plugin_id][invocation.value] = generation
+                lease_id = _lease_id(
+                    current.ref,
+                    current.activation_epoch,
+                    capability_key,
+                    context.run_id,
+                    invocation.value,
+                    generation,
+                )
             lease = ExecutionLease(
                 lease_id=lease_id,
                 plugin=current.ref,
@@ -377,6 +394,7 @@ def _lease_id(
     capability_key: CapabilityKey,
     run_id: RunId,
     invocation: str,
+    generation: int = 0,
 ) -> str:
     encoded = "\x1f".join(
         (
@@ -386,6 +404,7 @@ def _lease_id(
             *capability_key,
             run_id.value,
             invocation,
+            str(generation),
         )
     ).encode()
     return "plugin-lease:" + hashlib.sha256(encoded).hexdigest()

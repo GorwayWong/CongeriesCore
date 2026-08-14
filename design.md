@@ -122,10 +122,59 @@ AgentNode child Runs, authorized durable node-output references, checkpoint-base
 recovery, and ApprovalNode coordination. Checkpoint, Run marker, restoration,
 migration, fallback, and approval services remain independently replaceable.
 EvaluationNode composes the provider-neutral Evaluation harness and persists
-both successful and non-successful boundaries. Skill, Tool, Context, custom node
+both successful and non-successful boundaries. ContextNode embeds the existing
+ContextBinding, resolves only through the injected ContextResolver, and persists
+its fixed typed result before committing the stable node Checkpoint. Stable
+ContextNode recovery skips Provider execution; interrupted execution reuses its
+idempotency identity. SkillNode resolves one declared resource and loads only
+through SkillResourceGateway. ToolNode persists a frozen request and durable
+operation intent before entering ToolGateway; ToolExecutionGuard moves the
+operation to dispatching before the first executor attempt. Unknown external
+outcomes remain pending in the Tool Operation Log and pause the Workflow until an
+authorized application supplies durable resolution evidence. Custom node
 execution, parallel scheduling, and external engine adapters remain deferred;
 their delivery order is owned by
 [tasks.md](tasks.md).
+
+In operational terms, ContextNode is an adapter between two already-stable
+subsystems rather than a second context runtime:
+
+```text
+Workflow definition
+    -> ContextNodeConfig(ContextBinding)
+    -> ContextResolver
+       -> Authorized ContextProvider capability/provide calls
+    -> ContextNodeResult
+    -> NodeOutputPersistence
+    -> durable output reference
+    -> stable Checkpoint
+    -> downstream Workflow node
+```
+
+The Workflow layer owns only the typed node config and the persistable result
+envelope. ContextResolver continues to own Provider selection and active-call
+control; NodeOutputPersistence and CheckpointCoordinator continue to own durability
+and recovery eligibility.
+
+ToolNode adds a separate durability plane without changing Checkpoint v1:
+
+```text
+ToolNodeRequest -> NodeOutputPersistence
+                -> ToolOperationLog(prepared)
+                -> pending Checkpoint CAS
+                -> ToolGateway + guard(dispatching)
+                -> ToolNodeResult + terminal operation
+                -> stable Checkpoint CAS
+
+dispatching + uncertain response -> unknown -> paused WorkflowRun
+unknown + explicit evidence      -> succeeded | failed
+```
+
+The Tool Operation Store is replaceable. Core provides in-memory and SQLite
+reference implementations; SQLite uses WAL and version-predicate updates. Runtime
+Events remain observability and cannot resolve an operation. The normative state,
+authorization, and recovery contract is
+[RFC-0016](docs/rfcs/RFC-0016-tool-operation-log.md).
 
 ## 4. Run, Session, and Workspace
 

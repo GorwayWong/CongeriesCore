@@ -30,7 +30,7 @@ follow-up work.
 | Runtime Events | Implemented | Versioned envelope, schema registry, redaction, observability queue, reliable audit outbox, and SQLite reference adapter |
 | Execution Harness and Storage | Implemented | RunService lifecycle coordination, active Provider-call cancellation, recovery, approval persistence, Evaluation, authorized Workspace/Artifact/Checkpoint storage, and in-memory plus SQLite reference adapters |
 | Context, Memory, Model, and direct Agent execution | Implemented | Authorized Context resolution, independent Memory operations, Model generation and streaming, AgentSpec registries, and root AgentRun execution |
-| Workflow | In Progress | Minimal direct runtime with versioned contracts, DAG validation, AgentNode child Runs, durable output references, checkpoint recovery, ApprovalNode, EvaluationNode, and exact fixtures; remaining node catalog and engine adapters are deferred |
+| Workflow | In Progress | Minimal direct runtime with AgentNode, ApprovalNode, EvaluationNode, ContextNode, read-only SkillNode, ToolNode with a durable operation log and explicit unknown resolution, recovery matrices, and exact fixtures; custom nodes and engine adapters are deferred |
 | Plugins, Skills, Tools, and MCP | Implemented | Plugin v1 lifecycle and leases, immutable Skill/Tool contracts and gateways, transport-neutral MCP composition, authorization, events, and exact fixtures |
 
 ### 1.3 Current Workflow Milestone
@@ -55,7 +55,9 @@ deliberately narrow Task 4.1 slice and followed this dependency order:
 
 SkillNode, ToolNode, ContextNode, EvaluationNode, custom node extensions, and
 external Workflow engine adapters were outside this first slice. EvaluationNode
-was delivered afterward by Task 4.3. The other node types remain deferred, and
+was delivered afterward by Task 4.3 and ContextNode by the next Task 4.1
+increment. SkillNode and ToolNode were delivered by the next guarded increments;
+custom nodes and engine adapters remain deferred, and
 unsupported contracts are rejected during validation rather than skipped at
 runtime.
 
@@ -378,11 +380,23 @@ Delivered in the first slice:
 - ApprovalNode waiting, restart reconstruction, authorized decisions, and
   downstream resumption through the existing ApprovalCoordinator
 
-Still deferred after the Evaluation delivery:
+Still deferred after the SkillNode and ToolNode delivery:
 
-- SkillNode, ToolNode, and ContextNode execution
 - Custom node registration and capability discovery
 - External Workflow engine adapters and distributed scheduling
+
+Delivered in the ContextNode increment:
+
+- Frozen `ContextNodeConfig` and fixed `ContextNodeResult` Schema with strict
+  decoding and exact complete and partial fixtures
+- Pure pre-dispatch validation of Context requirement Schemas, registered actions,
+  and exact Provider permission resources
+- Authorized dispatch through only the injected ContextResolver, including
+  required-complete and allowed-partial behavior
+- Durable output persistence before the stable Checkpoint and downstream unlock
+- Denial, timeout, cancellation, swallowed late result, malformed result, Schema
+  failure, persistence interruption, Checkpoint interruption, and recovery tests
+- Stable recovery skip and interrupted replay with the same idempotency identity
 
 Acceptance:
 
@@ -508,8 +522,7 @@ Delivered:
   lease without automatic Agent context injection
 - Schema-aware Tool execution with grant narrowing, whole-call deadline, stable
   operation identity, in-lease retry, output validation, and replay conflict
-- SkillToolResolver preflight for AgentSpec and future Workflow adapters while
-  Workflow SkillNode/ToolNode execution remains unsupported
+- SkillToolResolver preflight shared by AgentSpec and Workflow adapters
 - AgentSpec v2 exact CapabilityRef encoding with byte-exact legacy v1 reading and
   explicit `upgrade_v2()` migration
 - Redacted Skill and Tool observability events plus exact descriptors, calls,
@@ -616,7 +629,6 @@ Explicit exclusions:
 
 - Raw database, table, filesystem, or generic CRUD exposure
 - Agent Tool execution loops and automatic Skill injection
-- Workflow SkillNode/ToolNode scheduling
 - Parallel Workflow scheduling or external Workflow engine integration
 - A mandatory MCP client or server SDK dependency in Core
 
@@ -738,59 +750,39 @@ Acceptance:
 - Runtime Events are not Event Sourcing.
 - No mandatory dependency on a specific Agent framework or infrastructure.
 
-## 9. Next Recommended Milestone
+## 9. Completed ContextNode Milestone
 
-Tasks 6.2 and 6.3 have completed the storage and compatibility foundation. The
-next milestone returns to Task 4.1 and implements Workflow `ContextNode` by
-composing the existing ContextResolver without creating another Provider,
-authorization, persistence, or recovery path.
+The ContextNode milestone composes the existing ContextResolver without adding a
+Provider, authorization, persistence, checkpoint, scheduler, or recovery path.
+Its version 1 config embeds ContextBinding; its fixed durable result Schema is
+strictly validated and covered by exact complete and partial fixtures. Runtime
+tests verify complete, partial, denial, timeout, cancellation, swallowed late
+results, malformed and Schema-invalid Provider output, persistence and Checkpoint
+ordering, stable recovery skip, and interrupted replay identity.
 
-Recommended order:
+## 10. Completed SkillNode and ToolNode Milestone
 
-1. Add an RFC-0003 increment before runtime code. Resolve the exact version 1
-   `ContextNodeConfig`, whether the existing ContextBinding is embedded or
-   referenced, and the strict JSON shape used to persist a ResolvedContext. Do
-   not leave node-specific meaning inside an untyped config dictionary.
-2. Extend Workflow model decoding and validation. Reject unsupported versions,
-   malformed bindings, mismatched input/output schemas, missing Context actions,
-   or permissions whose Provider resources do not match the configured binding
-   before creating a child call or Checkpoint.
-3. Add one injected ContextResolver dependency to WorkflowRuntime. Derive the
-   node RuntimeCallContext from the parent Run, node Scope, deadline, cancellation,
-   trace, and stable idempotency identity; do not call ContextProviderRegistry or
-   a StorageProvider directly from the node executor.
-4. Convert the successful ResolvedContext into the frozen node result shape and
-   persist it through NodeOutputPersistence before marking the node successful.
-   Commit the stable Checkpoint only after that durable reference exists.
-5. Preserve failure semantics. Required-complete bindings reject partial results;
-   denial, timeout, cancellation, Provider failure, malformed output, and output
-   persistence failure unlock no downstream node. A recovered stable node loads
-   its reference and skips Provider execution.
-6. Add exact config/result fixtures and focused unit plus Workflow integration
-   tests. Cover pre-dispatch validation, permission/resource matching, successful
-   complete and allowed-partial resolution, default denial, deadline,
-   cancellation, late-result discard, persistence ordering, checkpoint failure,
-   and recovery skip before changing RFC-0003 coverage notes.
+SkillNode was delivered first as one declared read-only resource loaded only through
+SkillResourceGateway. Its strict config/result Schemas, exact permissions, stable
+identity, sequential replay lease generation, persistence ordering, timeout,
+cancellation, drain, late-result, and full recovery matrix are covered by contract,
+integration, and exact-fixture tests.
 
-Why ContextNode first: it is a read-oriented composition of an already
-implemented authorized resolver, so it exercises Workflow value persistence and
-recovery with less side-effect risk than SkillNode or ToolNode. It should add no
-new Provider, authorization, storage, scheduler, or engine abstraction.
+ToolNode was delivered only after that gate. It freezes request and result
+contracts, descriptor identity, caller-key idempotency, and canonical SHA-256
+fingerprints. Tool execution remains behind ToolGateway. A one-shot
+ToolExecutionGuard makes dispatching durable before executor entry.
 
-Milestone acceptance:
+The independent Tool Operation Log is implemented through a replaceable store and
+authorized gateway, with in-memory and SQLite WAL reference adapters. Shared tests
+cover prepare replay, payload drift, CAS, concurrency, Scope, default denial, and
+restart. Workflow tests cover request, prepare, pre-dispatch Checkpoint, guard,
+result persistence, terminal operation, and stable Checkpoint crash windows.
+Unknown never unlocks downstream or automatically replays; explicit evidence-based
+success resumes the same Run and explicit failure terminates it.
 
-- ContextNode is rejected during validation until its full versioned contract,
-  schemas, binding, permissions, and Provider resources are valid.
-- Runtime dispatch goes only through ContextResolver and the existing
-  AuthorizedDispatcher path.
-- A successful output is durably referenced before the stable node Checkpoint;
-  non-success never unlocks dependents.
-- Deadline and cancellation clean up active Provider work, and late results cause
-  no Workflow persistence or state transition.
-- Recovery skips a stable ContextNode and replays only interrupted work with the
-  same identity.
-- Exact fixtures, pytest coverage at or above 90%, Ruff, Pyright, and whitespace
-  gates remain green.
+Checkpoint v1 remains byte-compatible. Exact fixtures cover SkillNode, ToolNode,
+Tool operation records, suspension, and resolution.
 
-Agent Tool loops, automatic Skill injection, parallel scheduling, and external
-Workflow engines remain separately reviewed future work.
+Custom node registration, automatic Skill injection, Agent Tool loops, parallel
+scheduling, and external Workflow engines remain separately reviewed future work.

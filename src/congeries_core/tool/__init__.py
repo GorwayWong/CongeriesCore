@@ -4,6 +4,7 @@ from .gateway import (
     TOOL_INVOCATION_COMPLETED,
     TOOL_INVOCATION_FAILED,
     TOOL_INVOCATION_STARTED,
+    ToolExecutionGuard,
     ToolGateway,
 )
 from .model import (
@@ -19,6 +20,21 @@ from .model import (
     ToolSideEffect,
     tool_actions,
 )
+from .operation import (
+    TOOL_OPERATION_CONTRACT_VERSION,
+    TOOL_OPERATION_PREPARE_ACTION,
+    TOOL_OPERATION_READ_ACTION,
+    TOOL_OPERATION_RESOLVE_ACTION,
+    TOOL_OPERATION_TRANSITION_ACTION,
+    InMemoryToolOperationStore,
+    PrepareToolOperation,
+    ToolOperationGateway,
+    ToolOperationRecord,
+    ToolOperationStatus,
+    ToolOperationStore,
+    TransitionToolOperation,
+    tool_operation_actions,
+)
 from .registry import ResolvedTool, ToolRegistry
 
 __all__ = [
@@ -27,16 +43,30 @@ __all__ = [
     "TOOL_INVOCATION_COMPLETED",
     "TOOL_INVOCATION_FAILED",
     "TOOL_INVOCATION_STARTED",
+    "TOOL_OPERATION_CONTRACT_VERSION",
+    "TOOL_OPERATION_PREPARE_ACTION",
+    "TOOL_OPERATION_READ_ACTION",
+    "TOOL_OPERATION_RESOLVE_ACTION",
+    "TOOL_OPERATION_TRANSITION_ACTION",
+    "InMemoryToolOperationStore",
+    "PrepareToolOperation",
     "ResolvedTool",
     "ToolCall",
     "ToolDescriptor",
+    "ToolExecutionGuard",
     "ToolExecutionPolicy",
     "ToolExecutor",
     "ToolGateway",
     "ToolIdempotencyMode",
     "ToolImplementation",
+    "ToolOperationGateway",
+    "ToolOperationRecord",
+    "ToolOperationStatus",
+    "ToolOperationStore",
     "ToolRegistry",
     "ToolResult",
     "ToolSideEffect",
+    "TransitionToolOperation",
     "tool_actions",
+    "tool_operation_actions",
 ]

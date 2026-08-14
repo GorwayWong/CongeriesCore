@@ -89,6 +89,38 @@ provide at-least-once node execution. Side-effecting nodes shall use idempotency
 keys. Graph-version mismatch shall reject recovery unless a migration is
 registered.
 
+Workflow ContextNode shall embed a typed ContextBinding, accept no Workflow value
+input, and produce the fixed versioned ContextNode result Schema. Validation shall
+confirm binding Schemas, Context actions, and exact Provider permission resources
+before RUNNING or the initial Checkpoint. Execution shall use only the injected
+ContextResolver. A successful result shall be persisted by reference before its
+stable Checkpoint may unlock dependents. Partial, denial, timeout, cancellation,
+late result, Provider or Schema failure, and recovery behavior shall preserve the
+ContextProvider, authorization, checkpoint, and idempotency contracts.
+
+Workflow SkillNode shall name one declared read-only Skill resource, accept no
+Workflow value input, and produce the fixed versioned SkillNode result Schema.
+Validation shall resolve the exact Skill owner, version, resource, Action, budget,
+and permission before RUNNING. Runtime shall load only through the injected Skill
+resource gateway, persist the typed result before Checkpoint, skip committed reads,
+and replay interrupted reads sequentially with the same logical identity.
+
+Workflow ToolNode shall freeze the Tool call, descriptor snapshot, Scope, timeout,
+stable idempotency key, canonical request fingerprint, and typed result contract.
+Validation shall require one exact input binding, registered input/output Schemas,
+Action and permission, descriptor-consistent side-effect classification, and
+caller-key idempotency for external effects. Runtime shall dispatch only through
+ToolGateway and shall commit a pre-dispatch Checkpoint before executor entry.
+
+Side-effecting Tool operations shall use an independently durable, replaceable
+Tool Operation Log with compare-and-set transitions. An uncertain post-dispatch
+outcome shall become `unknown`, keep the node pending, pause the same WorkflowRun,
+never unlock dependents, and never automatically replay or query the external
+system. An authorized application actor may resolve unknown only with an expected
+record version and durable evidence. Confirmed success resumes the same Run after
+output Schema validation; confirmed failure commits a stable error and terminates
+the Run. Checkpoint v1 shall remain byte-compatible.
+
 ### 5.5 Evaluation
 
 Evaluation shall apply schema validation, content policy evaluation, and one

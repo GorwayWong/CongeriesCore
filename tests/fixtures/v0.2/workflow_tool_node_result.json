@@ -1,0 +1,29 @@
+{
+  "contract_version": "1",
+  "operation_id": "operation-1",
+  "tool": {
+    "namespace": "core",
+    "kind": "tool",
+    "id": "workflow-tool",
+    "owning_extension": "test-plugin",
+    "contract_version": "1"
+  },
+  "request_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "status": "succeeded",
+  "result": {
+    "tool": {
+      "namespace": "core",
+      "kind": "tool",
+      "id": "workflow-tool",
+      "owning_extension": "test-plugin",
+      "contract_version": "1"
+    },
+    "output": {
+      "value": "done"
+    },
+    "attempts": 1,
+    "operation_identity": "operation-key"
+  },
+  "error": null,
+  "evidence_ref": null
+}

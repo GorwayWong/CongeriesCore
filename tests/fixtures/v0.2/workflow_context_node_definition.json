@@ -1,0 +1,124 @@
+{
+  "contract_version": "1",
+  "workflow_id": "workflow-context-1",
+  "definition_id": "workflow-context-definition-1",
+  "version": "1",
+  "input_schema": {
+    "namespace": "test",
+    "name": "workflow_value",
+    "version": "1"
+  },
+  "nodes": [
+    {
+      "node_id": "context",
+      "node_type": "context",
+      "contract_version": "1",
+      "input_schema": null,
+      "input_bindings": [],
+      "output_schema": {
+        "namespace": "core",
+        "name": "context_node_result",
+        "version": "1"
+      },
+      "scope": {
+        "namespace": "core",
+        "kind": "run",
+        "id": "node-context",
+        "parent": {
+          "namespace": "core",
+          "kind": "workspace",
+          "id": "workspace-1",
+          "parent": null
+        }
+      },
+      "permissions": [
+        {
+          "action": {
+            "namespace": "core",
+            "name": "workflow.node.execute",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "workflow_node",
+            "id": "context",
+            "owning_extension": null
+          }
+        },
+        {
+          "action": {
+            "namespace": "core",
+            "name": "context.capabilities",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "context_provider",
+            "id": "context-a",
+            "owning_extension": null
+          }
+        },
+        {
+          "action": {
+            "namespace": "core",
+            "name": "context.provide",
+            "version": "1"
+          },
+          "resource": {
+            "namespace": "core",
+            "kind": "context_provider",
+            "id": "context-a",
+            "owning_extension": null
+          }
+        }
+      ],
+      "timeout_seconds": 30,
+      "retry_limit": 0,
+      "side_effecting": false,
+      "idempotency_required": true,
+      "checkpoint": true,
+      "config": {
+        "binding": {
+          "provider_ids": [
+            "context-a"
+          ],
+          "requirements": [
+            {
+              "key": {
+                "namespace": "test",
+                "name": "profile"
+              },
+              "schema": {
+                "namespace": "test",
+                "name": "profile",
+                "version": "1"
+              }
+            }
+          ],
+          "merge_strategy": "single",
+          "completeness_policy": "require_complete",
+          "budget": {
+            "max_bytes": null,
+            "max_tokens": null
+          }
+        }
+      }
+    }
+  ],
+  "dependencies": [],
+  "output_schema": {
+    "namespace": "core",
+    "name": "context_node_result",
+    "version": "1"
+  },
+  "output_binding": {
+    "source_node_id": "context",
+    "required": true
+  },
+  "execution_policy": {
+    "max_concurrency": 1,
+    "failure_mode": "fail_fast",
+    "compensation_enabled": false,
+    "max_attempts": 1
+  }
+}

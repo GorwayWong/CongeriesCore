@@ -148,6 +148,10 @@ class SkillResourceGateway:
                     registration.declaration.key == request.skill.registration_key
                     and resource == authorization_resource
                 ),
+                # Skill resources are read-only. Recovery may therefore replay a
+                # completed physical lease under the same logical operation key,
+                # while the invocation reservation still rejects overlap.
+                allow_completed_replay=True,
             )
             await self._emit(
                 SKILL_RESOURCE_LOAD_COMPLETED,
